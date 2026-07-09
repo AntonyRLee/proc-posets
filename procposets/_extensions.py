@@ -42,13 +42,15 @@ def preds(elements: Iterable, pairs) -> Dict:
     return {e: frozenset(s) for e, s in p.items()}
 
 
-def ideal_state_bound(elements, pairs) -> int:
+def ideal_state_bound(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> int:
     """Upper bound on the number of order ideals, via a greedy chain cover.
 
     Every ideal meets each chain of a chain cover in a prefix, so
     #ideals <= prod_i (|c_i| + 1) for ANY chain cover -- a sound (if not
     minimal) budget check.  Chains are peeled greedily longest-first by DP
-    on the DAG; the whole check is polynomial.
+    on the DAG; the whole check is polynomial.  ``max_states`` is the
+    threshold at which the running product short-circuits (the caller's
+    knob -- ``rel.MAX_IDEAL_STATES`` / the module default).
     """
     remaining = set(elements)
     bound = 1
@@ -75,32 +77,32 @@ def ideal_state_bound(elements, pairs) -> int:
             chain.append(best[chain[-1]][1])
         bound *= len(chain) + 1
         remaining -= set(chain)
-        if bound > MAX_IDEAL_STATES:
+        if bound > max_states:
             return bound
     return bound
 
 
-def check_ideal_budget(elements, pairs) -> None:
-    bound = ideal_state_bound(elements, pairs)
-    if bound > MAX_IDEAL_STATES:
+def check_ideal_budget(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> None:
+    bound = ideal_state_bound(elements, pairs, max_states)
+    if bound > max_states:
         raise IdealBudgetExceeded(
             f"ideal-lattice DP refused: chain-cover bound of {bound:.2e} "
-            f"states exceeds MAX_IDEAL_STATES = {MAX_IDEAL_STATES:.0e} "
+            f"states exceeds the budget = {max_states:.0e} "
             f"(poset too wide for exact e(P) on this budget)"
         )
 
 
-def count_extensions(elements, pairs) -> int:
+def count_extensions(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> int:
     """e(P) for an arbitrary partial order, by DP over the ideal lattice.
 
     e(remaining) = sum over minimal x of remaining of e(remaining - x).
     The memo has one entry per order ideal -- at most 2^m, and typically far
     fewer; this is exact for every poset, with cost exponential only in the
     width.  A chain-cover bound on the ideal count is certified against
-    MAX_IDEAL_STATES before recursing; a too-wide poset raises
+    ``max_states`` before recursing; a too-wide poset raises
     IdealBudgetExceeded instead of hanging (DESIGN_REVIEW W12.1).
     """
-    check_ideal_budget(elements, pairs)
+    check_ideal_budget(elements, pairs, max_states)
     pr = preds(elements, pairs)
     memo: Dict[FrozenSet, int] = {frozenset(): 1}
 
@@ -115,7 +117,7 @@ def count_extensions(elements, pairs) -> int:
     return rec(frozenset(elements))
 
 
-def sample_extension(elements, pairs, rng) -> Tuple:
+def sample_extension(elements, pairs, rng, max_states: int = MAX_IDEAL_STATES) -> Tuple:
     """Uniform linear extension of an arbitrary partial order.
 
     Sequential sampling with the ideal-lattice DP as the exact proposal:
@@ -123,7 +125,7 @@ def sample_extension(elements, pairs, rng) -> Tuple:
     telescopes to 1/e(P) for every completed extension.  Guarded by the same
     ideal-state budget as count_extensions.
     """
-    check_ideal_budget(elements, pairs)
+    check_ideal_budget(elements, pairs, max_states)
     pr = preds(elements, pairs)
     memo: Dict[FrozenSet, int] = {frozenset(): 1}
 

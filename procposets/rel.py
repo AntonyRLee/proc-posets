@@ -107,19 +107,30 @@ def transitive_reduction(rel: Rel) -> Rel:
 # General posets: extension counting / sampling by DP over order ideals
 # ---------------------------------------------------------------------------
 
-# The guarded ideal-lattice engine (count / sample / budget guard) now
-# lives once in procposets._extensions and is shared with the canonical
-# Poset (poset.py).  Re-exported here under the Rel-flavoured names so
-# every existing caller (oracle, initialiser, the poset classes) is
-# unchanged; the element type is irrelevant, only the order pairs matter.
+# The guarded ideal-lattice engine (count / sample / budget guard) now lives
+# once in procposets._extensions and is shared with the canonical Poset
+# (poset.py); the element type is irrelevant, only the order pairs matter.
+# The thin wrappers below read this module's MAX_IDEAL_STATES *at call time*
+# and pass it in, so monkeypatching rel.MAX_IDEAL_STATES (the historical
+# knob, e.g. in the oracle-downgrade test) still steers the guard.
 from ._extensions import (  # noqa: E402
     IdealBudgetExceeded,
     MAX_IDEAL_STATES,
-    check_ideal_budget as _check_ideal_budget,
-    count_extensions as count_linear_extensions,
     preds as _preds,
-    sample_extension as sample_linear_extension,
 )
+from . import _extensions as _ext  # noqa: E402
+
+
+def count_linear_extensions(elements, rel) -> int:
+    return _ext.count_extensions(elements, rel, max_states=MAX_IDEAL_STATES)
+
+
+def sample_linear_extension(elements, rel, rng):
+    return _ext.sample_extension(elements, rel, rng, max_states=MAX_IDEAL_STATES)
+
+
+def _check_ideal_budget(elements, rel) -> None:
+    _ext.check_ideal_budget(elements, rel, max_states=MAX_IDEAL_STATES)
 
 
 def enumerate_posets(elements: Iterable[str]) -> List[Rel]:
