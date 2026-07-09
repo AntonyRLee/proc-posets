@@ -4,21 +4,27 @@ version = "0.1.0"
 description = "Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research."
 readme = "README.md"
 requires-python = ">=3.10"          # verified: no first-party source in any consumer repo uses >3.10 syntax
-dependencies = ["numpy>=1.24"]      # the only hard runtime dep; Layer A0 + the cospan algebra (B0) are pure stdlib
+# NO hard runtime dependency: `import procposets` and the whole stdlib core
+# (poset algebra, decomposition, traces, stochastic-matrix distance, known-law
+# EM) pull nothing third-party.  numpy / networkx / pm4py / matplotlib are all
+# opt-in extras below; the numpy-backed NPMLE estimator loads lazily (PEP 562
+# __getattr__ in __init__), so touching it is what pulls numpy.
+dependencies = []
 
-# Lower bounds are kept 3.10-installable so the numpy-only core floor (>=3.10,
-# required for the NPMLE path-dep) still yields a resolvable universal lock:
-# uv fork-resolves each extra to a 3.10-compatible release on the 3.10 branch
-# and the newest on 3.13.  The extras are actually exercised at 3.12/3.13
-# (where SIM/SPME pin networkx 3.6.1 / pandas 3.0.3); consumers pin tighter.
+# Lower bounds are kept 3.10-installable so the >=3.10 floor (required for the
+# NPMLE path-dep) still yields a resolvable universal lock: uv fork-resolves
+# each extra to a 3.10-compatible release on the 3.10 branch and the newest on
+# 3.13.  The extras are exercised at 3.12/3.13; consumers pin tighter.
 [project.optional-dependencies]
-graph = ["networkx>=3.1"]                                    # Layer B1: occurrence / splice / trace-language / DP extraction
-pm4py = ["pm4py>=2.7.22.5", "pandas>=2.0", "networkx>=3.1"]  # Layer B2: model adapters (implies the graph paths)
-viz   = ["matplotlib>=3.8", "graphviz>=0.21"]                # Layer C: renderers (dag_render also needs the `dot` binary)
-all   = ["procposets[graph,pm4py,viz]"]
+estimate = ["numpy>=1.24"]                                   # Layer A1 (numpy): the NPMLE Frank-Wolfe estimator + M9 initialiser
+graph    = ["networkx>=3.1"]                                 # Layer B1: occurrence / splice / trace-language / DP extraction
+pm4py    = ["pm4py>=2.7.22.5", "pandas>=2.0", "networkx>=3.1"]  # Layer B2: model adapters (implies the graph paths)
+viz      = ["matplotlib>=3.8", "graphviz>=0.21", "numpy>=1.24"] # Layer C: renderers (string_diagram/spm_viz use numpy; dag_render needs the `dot` binary)
+all      = ["procposets[estimate,graph,pm4py,viz]"]
 
 [dependency-groups]
-dev = ["pytest>=9.1.1", "matplotlib>=3.10.9"]
+# the package's own suite exercises every layer, so dev pulls numpy + matplotlib
+dev = ["pytest>=9.1.1", "numpy>=1.24", "matplotlib>=3.10.9"]
 
 [build-system]
 requires = ["hatchling"]

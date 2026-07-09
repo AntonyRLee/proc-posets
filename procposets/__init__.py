@@ -11,9 +11,16 @@ Two poset views coexist:
 - the canonical id+label ``Poset`` object (``poset`` module) -- carries
   repeated labels; ``bridge.to_rel`` / ``bridge.from_rel`` convert.
 
-Layers land phase by phase: this exposes A0 (the pure-stdlib poset core) and
-A1 (numpy estimation + stdlib stochastic distance).  The cospan algebra (B0+)
-arrives with later phases.
+**Dependency-free core.**  ``import procposets`` and every stdlib module
+(poset algebra, decomposition, traces, grouping, the stochastic-matrix
+distance and known-law estimators) pull **no third-party package**.  The
+numpy-backed NPMLE estimator (``likelihood``/``oracle``/``npmle``/
+``initialiser``/``diagnostics``) is loaded **lazily** and needs the
+``[estimate]`` extra; networkx/pm4py/matplotlib sit behind ``[graph]`` /
+``[pm4py]`` / ``[viz]``.  So the top-level names ``fit``, ``GroupedLog``,
+``Oracle``, ``moment_seed``, ``recovery_report`` etc. resolve on first access
+(PEP 562) and only then import numpy -- consumers that never touch the
+estimator (e.g. the stochastic-distance stack) install numpy-free.
 """
 
 __version__ = "0.1.0"
@@ -66,38 +73,16 @@ from .grouping import group_by_key
 from .bridge import LabelCollision, from_rel, rel_elements, to_rel
 
 # ===========================================================================
-# Layer A1 — estimation (numpy) + stochastic distance (stdlib)
+# Layer A1 (stdlib) — simulation, stochastic-matrix distance, known-law EM
+# (numpy-free; eager)
 # ===========================================================================
 
-# NPMLE certified mixture estimator + M9 moment initialiser (numpy)
-from .likelihood import Atom, GroupedLog, TimedGroupedLog, make_atom
-from .npmle import (
-    FitResult,
-    fit,
-    polish_nuisances,
-    refit_weights,
-    trivial_chain_loglik,
-)
-from .oracle import Oracle
-from .initialiser import (
-    find_margin_equivalences,
-    margin_equivalent,
-    moment_seed,
-    poset_moment,
-)
 from .simulate import (
     TrueMixture,
     sample_grouped_log,
     sample_keyed_log,
     sample_timed_grouped_log,
 )
-from .diagnostics import (
-    bootstrap_weights,
-    identifiability_report,
-    recovery_report,
-)
-
-# SPME stochastic-matrix distance + known-law EM/counting (stdlib)
 from .distance import bhattacharyya_angle, smd, smd_pairwise, smd_rows
 from .matrix import build as build_block_matrix
 from .matrix import normal_form_distribution
@@ -110,6 +95,41 @@ from .estimate import (
     variant_laws,
 )
 from .loops import empirical_loop_model, loop_limit, loop_model, unrolling
+
+# ===========================================================================
+# Layer A1 (numpy) — the NPMLE estimator + M9 initialiser, loaded LAZILY so
+# `import procposets` stays numpy-free.  Each name below resolves on first
+# access (PEP 562 __getattr__), importing its module (which imports numpy)
+# only then.  Needs the [estimate] extra.
+# ===========================================================================
+
+_LAZY = {  # top-level name -> (submodule, attribute)
+    **{n: ("likelihood", n) for n in
+       ("Atom", "GroupedLog", "TimedGroupedLog", "make_atom")},
+    **{n: ("npmle", n) for n in
+       ("FitResult", "fit", "polish_nuisances", "refit_weights",
+        "trivial_chain_loglik")},
+    "Oracle": ("oracle", "Oracle"),
+    **{n: ("initialiser", n) for n in
+       ("moment_seed", "poset_moment", "margin_equivalent",
+        "find_margin_equivalences")},
+    **{n: ("diagnostics", n) for n in
+       ("recovery_report", "identifiability_report", "bootstrap_weights")},
+}
+
+
+def __getattr__(name):  # PEP 562: lazy numpy-layer resolution
+    info = _LAZY.get(name)
+    if info is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+    val = getattr(importlib.import_module(f"{__name__}.{info[0]}"), info[1])
+    globals()[name] = val  # cache so subsequent access skips __getattr__
+    return val
+
+
+def __dir__():
+    return sorted(list(globals()) + list(_LAZY))
 
 __all__ = [
     # Rel toolkit
