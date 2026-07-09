@@ -107,136 +107,19 @@ def transitive_reduction(rel: Rel) -> Rel:
 # General posets: extension counting / sampling by DP over order ideals
 # ---------------------------------------------------------------------------
 
-def _preds(elements: Iterable[str], rel: Rel) -> Dict[str, FrozenSet[str]]:
-    p: Dict[str, set] = {e: set() for e in elements}
-    for a, b in rel:
-        p[b].add(a)
-    return {e: frozenset(s) for e, s in p.items()}
-
-
-# Hard ceiling on the ideal-lattice DP's state count.  The DP is exponential
-# only in poset width; the meet-closure oracle runs at *any* m, where meets of
-# a few long chains are typically wide -- without a guard this is the one
-# place the library can hang or exhaust memory with no printed verdict
-# (DESIGN_REVIEW W12.1).  The bound below is certified before recursing.
-MAX_IDEAL_STATES = 1_000_000
-
-
-class IdealBudgetExceeded(ValueError):
-    """The ideal-lattice DP would exceed MAX_IDEAL_STATES states.
-
-    Raised *before* any exponential work happens.  The oracle catches this,
-    skips the offending candidate, and downgrades the certificate loudly."""
-
-
-def _ideal_state_bound(elements: FrozenSet[str], rel: Rel) -> int:
-    """Upper bound on the number of order ideals, via a greedy chain cover.
-
-    Every ideal meets each chain of a chain cover in a prefix, so
-    #ideals <= prod_i (|c_i| + 1) for ANY chain cover -- a sound (if not
-    minimal) budget check.  Chains are peeled greedily longest-first by DP
-    on the DAG; the whole check is polynomial.
-    """
-    remaining = set(elements)
-    bound = 1
-    while remaining:
-        succs = {e: [b for (a, b) in rel if a == e and b in remaining]
-                 for e in remaining}
-        best: Dict[str, Tuple[int, Optional[str]]] = {}
-
-        def longest(x: str) -> int:
-            got = best.get(x)
-            if got is not None:
-                return got[0]
-            ln, nxt = 1, None
-            for y in succs[x]:
-                cand = 1 + longest(y)
-                if cand > ln:
-                    ln, nxt = cand, y
-            best[x] = (ln, nxt)
-            return ln
-
-        top = max(remaining, key=longest)
-        chain = [top]
-        while best[chain[-1]][1] is not None:
-            chain.append(best[chain[-1]][1])
-        bound *= len(chain) + 1
-        remaining -= set(chain)
-        if bound > MAX_IDEAL_STATES:
-            return bound
-    return bound
-
-
-def _check_ideal_budget(elements: FrozenSet[str], rel: Rel) -> None:
-    bound = _ideal_state_bound(elements, rel)
-    if bound > MAX_IDEAL_STATES:
-        raise IdealBudgetExceeded(
-            f"ideal-lattice DP refused: chain-cover bound of {bound:.2e} "
-            f"states exceeds MAX_IDEAL_STATES = {MAX_IDEAL_STATES:.0e} "
-            f"(poset too wide for exact e(P) on this budget)"
-        )
-
-
-def count_linear_extensions(elements: FrozenSet[str], rel: Rel) -> int:
-    """e(P) for an arbitrary partial order, by DP over the ideal lattice.
-
-    e(remaining) = sum over minimal x of remaining of e(remaining - x).
-    The memo has one entry per order ideal -- at most 2^m, and typically far
-    fewer; this is exact for every poset, with cost exponential only in the
-    width.  A chain-cover bound on the ideal count is certified against
-    MAX_IDEAL_STATES before recursing; a too-wide poset raises
-    IdealBudgetExceeded instead of hanging (DESIGN_REVIEW W12.1).
-    """
-    _check_ideal_budget(elements, rel)
-    preds = _preds(elements, rel)
-    memo: Dict[FrozenSet[str], int] = {frozenset(): 1}
-
-    def rec(rem: FrozenSet[str]) -> int:
-        got = memo.get(rem)
-        if got is not None:
-            return got
-        out = sum(rec(rem - {x}) for x in rem if not (preds[x] & rem))
-        memo[rem] = out
-        return out
-
-    return rec(frozenset(elements))
-
-
-def sample_linear_extension(elements: FrozenSet[str], rel: Rel, rng) -> Tuple[str, ...]:
-    """Uniform linear extension of an arbitrary partial order.
-
-    Sequential sampling with the ideal-lattice DP as the exact proposal:
-    the first element is x (minimal) with probability e(P - x) / e(P), which
-    telescopes to 1/e(P) for every completed extension.  Guarded by the same
-    ideal-state budget as count_linear_extensions.
-    """
-    _check_ideal_budget(elements, rel)
-    preds = _preds(elements, rel)
-    memo: Dict[FrozenSet[str], int] = {frozenset(): 1}
-
-    def count(rem: FrozenSet[str]) -> int:
-        got = memo.get(rem)
-        if got is not None:
-            return got
-        out = sum(count(rem - {x}) for x in rem if not (preds[x] & rem))
-        memo[rem] = out
-        return out
-
-    out: List[str] = []
-    rem = frozenset(elements)
-    while rem:
-        mins = sorted(x for x in rem if not (preds[x] & rem))
-        weights = [count(rem - {x}) for x in mins]
-        total = sum(weights)
-        r = rng.random() * total
-        acc = 0
-        for x, w in zip(mins, weights):
-            acc += w
-            if r < acc:
-                break
-        out.append(x)
-        rem = rem - {x}
-    return tuple(out)
+# The guarded ideal-lattice engine (count / sample / budget guard) now
+# lives once in procposets._extensions and is shared with the canonical
+# Poset (poset.py).  Re-exported here under the Rel-flavoured names so
+# every existing caller (oracle, initialiser, the poset classes) is
+# unchanged; the element type is irrelevant, only the order pairs matter.
+from ._extensions import (  # noqa: E402
+    IdealBudgetExceeded,
+    MAX_IDEAL_STATES,
+    check_ideal_budget as _check_ideal_budget,
+    count_extensions as count_linear_extensions,
+    preds as _preds,
+    sample_extension as sample_linear_extension,
+)
 
 
 def enumerate_posets(elements: Iterable[str]) -> List[Rel]:

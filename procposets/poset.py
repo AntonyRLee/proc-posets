@@ -39,6 +39,22 @@ class Poset:
         return len(self.elements)
 
 
+def _transitive_closure(less: set) -> set:
+    """Close a set of ``(u, v)`` = "u < v" pairs under transitivity, in place.
+
+    Single home for what ``from_dag`` and ``from_edges`` used to inline
+    byte-identically (an O(n^3) fixpoint loop)."""
+    changed = True
+    while changed:
+        changed = False
+        for a, b in list(less):
+            for c, d in list(less):
+                if b == c and (a, d) not in less:
+                    less.add((a, d))
+                    changed = True
+    return less
+
+
 def _fresh(p: Poset) -> Poset:
     """A copy of p with fresh element ids (so compositions never alias)."""
     m = {e: next(_ids) for e in p.elements}
@@ -101,14 +117,7 @@ def from_edges(nodes: dict, edges) -> Poset:
         from_edges({"a1":"a","b":"b","a2":"a","d":"d"}, [("a1","a2"),("b","a2"),("b","d")])."""
     ids = {key: next(_ids) for key in nodes}
     less = {(ids[u], ids[v]) for u, v in edges}
-    changed = True
-    while changed:                                   # transitive closure
-        changed = False
-        for a, b in list(less):
-            for c, d in list(less):
-                if b == c and (a, d) not in less:
-                    less.add((a, d))
-                    changed = True
+    _transitive_closure(less)                        # transitive closure
     return Poset(list(ids.values()), {ids[k]: lab for k, lab in nodes.items()}, less)
 
 
@@ -124,12 +133,34 @@ def from_dag(edges, nodes=()) -> Poset:
     uniq = list(dict.fromkeys(order))
     ids = {lab: next(_ids) for lab in uniq}
     less = {(ids[u], ids[v]) for u, v in edges}
-    changed = True
-    while changed:                                   # transitive closure
-        changed = False
-        for a, b in list(less):
-            for c, d in list(less):
-                if b == c and (a, d) not in less:
-                    less.add((a, d))
-                    changed = True
+    _transitive_closure(less)                        # transitive closure
     return Poset(list(ids.values()), {i: lab for lab, i in ids.items()}, less)
+
+
+# ---------------------------------------------------------------------------
+# Guarded linear-extension count / sample on the canonical Poset.
+#
+# Same engine as the Rel view (procposets._extensions): the canonical id-keyed
+# Poset gains the budget-guarded counter/sampler it lacked, so counting no
+# longer means enumerating every word (traces.linear_extensions) and cannot
+# hang on a wide poset (it raises IdealBudgetExceeded instead).  Works for
+# posets with REPEATED labels too (elements are ids, not labels).
+# ---------------------------------------------------------------------------
+
+from ._extensions import IdealBudgetExceeded  # noqa: E402,F401  (re-export)
+from ._extensions import count_extensions as _count
+from ._extensions import sample_extension as _sample
+
+
+def count_extensions(P: "Poset") -> int:
+    """e(P): the number of linear extensions, via the guarded ideal-lattice
+    DP.  Exact for every poset; raises ``IdealBudgetExceeded`` on a poset too
+    wide for the declared budget rather than hanging."""
+    return _count(P.elements, P.less)
+
+
+def sample_extension(P: "Poset", rng) -> tuple:
+    """A uniform random linear extension of ``P`` as a tuple of element ids
+    (map through ``P.labels`` for a label word).  Guarded like
+    ``count_extensions``."""
+    return _sample(P.elements, P.less, rng)

@@ -33,6 +33,7 @@ from .distance import _augment
 from .matrix import END, START, build
 from .moddecomp import Prime, Series, decompose
 from .poset import Poset
+from .poset import count_extensions
 from .traces import linear_extensions
 
 # --------------------------------------------------------------------------- Kemeny family
@@ -106,7 +107,7 @@ def _reweight(model, weighting: str):
     if weighting == "uniform_variant":
         return [(P, 1.0) for P, _ in model]
     if weighting == "lincount":
-        return [(P, float(len(linear_extensions(P)))) for P, _ in model]
+        return [(P, float(count_extensions(P))) for P, _ in model]
     if weighting in ("support", "given"):
         return list(model)
     raise ValueError(f"unknown weighting {weighting!r}")

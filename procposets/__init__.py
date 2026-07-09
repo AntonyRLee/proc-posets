@@ -48,6 +48,8 @@ from .rel import (
 
 # --- canonical Poset object (id+label; SPME base) --------------------------
 from .poset import Poset, from_dag, from_edges, leaf, n_poset, par, then
+from .poset import count_extensions  # guarded e(P) on the canonical Poset
+from ._extensions import IdealBudgetExceeded
 
 # --- total modular decomposition (SPME) ------------------------------------
 from .moddecomp import Leaf, Parallel, Prime, Series
@@ -120,6 +122,7 @@ __all__ = [
     "tree_relations", "series", "parallel", "enumerate_sp",
     # canonical Poset
     "Poset", "leaf", "then", "par", "n_poset", "from_dag", "from_edges",
+    "count_extensions", "IdealBudgetExceeded",
     # total modular decomposition
     "Leaf", "Series", "Parallel", "Prime", "modular_decompose", "tiling",
     # traces
