@@ -1,32 +1,20 @@
-"""Bounded grounding of a constrained signature (§38, the *practice* half).
+"""OCCN faithful per-firing grounding (§38-39) -- the OCCN half of unrolling.
 
-The symbolic constrained ``Signature`` (``occn_to_signature`` + §33 constraints) is
-the bound-independent comparison invariant. To *execute* it -- check feasibility,
-exhibit witness runs, kill the §35 box+``n`` leak -- we **ground** it: per generator,
-enumerate the concrete leg-multiplicity assignments its own constraints admit up to an
-order ``k`` (capping ``cmax = *`` at ``k``), one **weighted** generator per assignment
-(:attr:`Generator.weights`). The expanded signature then runs through the ordinary
-:func:`cpm.cospan.compose.compose_signature`: node multiplicity emerges from port
-accumulation (a 3-order bundle at ``s`` is fed by three ``b``-firings), and an
-over-count consumer variant is simply **unreachable** when its tokens never accumulate
-(the leak dies; see CLASS_EXTRACTION.md §38).
+Grounds a mined OCCN into a weighted, object-conserving cospan ``Signature``.
+Reads cardinalities off the OCCN markers on *both* sides plus a within-firing
+**conservation** ``Σ out_ot == Σ in_ot`` per object type, so each grounded
+generator conserves objects through one firing.
 
-**Faithful per-firing system (``ground_occn``).** Grounding reads cardinalities off the
-OCCN markers on *both* sides plus a within-firing **conservation** ``Σ out_ot == Σ in_ot``
-per object type -- so each grounded generator conserves objects through one firing. This
-differs from :func:`cpm.occn.to_signature.occn_to_signature`, which keeps only the
-*consumer*-side interval (the §35 choice that avoided the convergent-wire contradiction
-in the symbolic-global feasibility path). Grounding can carry both sides safely because
-a producer's per-firing output (``b -> s`` = 1) and the consumer's bundle (``s`` input =
-``[2,5]``) live on **different** generators and are reconciled by token accumulation, not
-by equating on one wire.
+This lives in ``occn`` (not ``cospan``) and imports *down* into
+:mod:`procposets.cospan.unroll_core`, so the cospan algebra never depends on
+the OCCN miner -- the dependency runs miner -> algebra, never the reverse.
 """
 from __future__ import annotations
 
-from ..occn.markers import OCCN, MarkerGroup
-from .constraints import constraint, cset, interval
-from .feasibility import all_solutions
-from .signature import Generator, Port, Signature
+from ..cospan.constraints import constraint, cset, interval
+from ..cospan.signature import Generator, Port, Signature
+from ..cospan.unroll_core import unroll_generator
+from .markers import OCCN, MarkerGroup
 
 
 def _types(group: MarkerGroup) -> frozenset[str]:
@@ -72,40 +60,10 @@ def _firing_system(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
     return cset(*cons)
 
 
-def unroll_generator(g: Generator, *, order: int = 8, max_assignments: int = 200_000) -> set[Generator]:
-    """Ground one generator into its weighted concrete instances (§38).
-
-    A generator with no constraints is already grounded (every leg weight 1) and is
-    returned unchanged. Otherwise each satisfying assignment of ``g.constraints`` (over
-    ``[0, order]``, ``cmax = *`` capped at ``order``) becomes one weighted generator;
-    the assignment's per-leg counts populate :attr:`Generator.weights`. Legs not
-    mentioned by any constraint keep weight 1 (they are absent from the assignment).
-    An infeasible generator yields the empty set (it drops out of the grounding)."""
-    if not g.constraints:
-        return {g}
-    out: set[Generator] = set()
-    for assign in all_solutions(g.constraints, bound=order, lo=0, max_assignments=max_assignments):
-        weights = frozenset((p, int(n)) for p, n in assign.items())
-        out.add(Generator(g.label, g.left, g.right, frozenset(), weights))
-    return out
-
-
-def unroll_signature(sig: Signature, *, order: int = 8, max_assignments: int = 200_000) -> Signature:
-    """Ground every generator of ``sig`` (see :func:`unroll_generator`). Weighted
-    variants dedup automatically: a :class:`Generator`'s ``weights`` is a frozenset of
-    ``(port, count)`` pairs, so the boundary multiset is canonical and two distinct
-    groundings never collapse while symmetric ones never duplicate (the §36
-    ``canonical_key`` multiset requirement, met by construction)."""
-    gens: set[Generator] = set()
-    for g in sig:
-        gens |= unroll_generator(g, order=order, max_assignments=max_assignments)
-    return Signature(frozenset(gens))
-
-
 def _boundary_generators(occn: OCCN) -> set[Generator]:
     """``START_<ot>``/``END_<ot>`` sources/sinks, weight 1 (one object per firing; a
     bundle of ``k`` objects enters as ``k`` firings, which token accumulation supplies).
-    Mirrors :func:`cpm.occn.to_signature._boundary_generators`."""
+    Mirrors :func:`procposets.occn.to_signature._boundary_generators`."""
     gens: set[Generator] = set()
     ocdg = occn.ocdg
     for otype, start_node in ocdg.starts.items():
@@ -183,9 +141,9 @@ def gamma_boundary(occn: OCCN, counts: dict[str, int], *, order: int) -> set[Gen
 def ground_run(occn: OCCN, counts: dict[str, int], *, order: int = 8, max_assignments: int = 200_000) -> Signature:
     """Grounded signature for one run with per-type object content ``counts`` (§39):
     the unrolled interior plus the γ1/γ2 boundary interface (:func:`gamma_boundary`).
-    Feed to :func:`cpm.cospan.extract_dp.extract_classes` (``one_origin=True``): γ1
-    fires once to seed the frontier, weight-aware reachability runs to γ2-closure, and
-    object contents with no closing path are pruned by reachability."""
+    Feed to :func:`procposets.cospan.extract_dp.extract_classes` (``one_origin=True``):
+    γ1 fires once to seed the frontier, weight-aware reachability runs to γ2-closure,
+    and object contents with no closing path are pruned by reachability."""
     gens = _interior_generators(occn, order=order, max_assignments=max_assignments)
     gens |= gamma_boundary(occn, counts, order=order)
     return Signature(frozenset(gens))

@@ -14,6 +14,7 @@ Validated against the authors' reference implementation; the validation harness
 from .fhm import OCDG, mine_ocdg
 from .markers import OCCN, Marker, MarkerGroup, mine_occn
 from .to_signature import occn_to_signature
+from .unroll_occn import gamma_boundary, ground_occn, ground_run
 
 __all__ = [
     "OCDG",
@@ -23,4 +24,5 @@ __all__ = [
     "MarkerGroup",
     "mine_occn",
     "occn_to_signature",
+    "ground_occn", "ground_run", "gamma_boundary",
 ]

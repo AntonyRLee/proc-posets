@@ -89,7 +89,7 @@ class Generator:
     consumes a bundle of 3 orders in one firing). It maps a boundary :class:`Port` to
     its object-count; ports absent from it carry weight 1. Empty (the default) = every
     leg weight 1, so a symbolic/ungrounded generator behaves exactly as before. The
-    unroller (:mod:`cpm.cospan.unroll`) sets it from a satisfying assignment of
+    unroller (:mod:`procposets.cospan.unroll_core`) sets it from a satisfying assignment of
     ``constraints``; :func:`cpm.cospan.compose.compose_signature` reads it via
     :meth:`weight`."""
 
