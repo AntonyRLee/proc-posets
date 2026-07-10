@@ -13,6 +13,43 @@ Series-parallel posets are exactly the prime-free ones. Prime blocks are kept AT
 REPEATED labels within a prime use a label-preserving-iso canonical form (`_prime_canonical_iso`,
 brute-force over element orderings) so iso primes match and non-iso primes with the same label
 multiset are kept apart.
+
+The recursion, precisely
+------------------------
+`decompose` runs the classical Gallai recursion. At each call, on the CURRENT fragment only:
+(1) if the comparability graph is disconnected, the node is PARALLEL and each component gets a
+fresh call from the top; (2) else if the incomparability graph is disconnected, the node is
+SERIES, the co-components (which are totally ordered as blocks) are sorted low->high, and each
+gets a fresh call from the top; (3) else the fragment is one atomic PRIME tile -- no recursion
+inside it. Two facts shape the tree. First, the tests are EXCLUSIVE, not ordered by preference:
+a graph and its complement cannot both be disconnected, so at most one split fires per node.
+Second, the "go back to (1)" is per CHILD, never a loop on the same node: a parallel child is
+comparability-connected by construction, so its call falls straight through to the series test,
+and a series child is co-connected, so its call can only split parallel (or be prime/leaf) --
+the tree therefore alternates series/parallel levels automatically, which is also why it is
+canonical (a parallel child of a parallel node would have merged into its parent).
+
+Simple vs linear-time
+---------------------
+This implementation is the naive recursion: each level recomputes connectivity on the induced
+fragment, so the worst case is roughly O(n * m) over the whole tree. The linear-time O(n + m)
+algorithms in the literature (the bound cited by the paper's canonical-tiling proposition) do NOT
+run this recursion top-down; they work in two phases: (i) compute a FACTORIZING PERMUTATION -- an
+ordering of the elements in which every strong module is consecutive -- by partition refinement,
+splitting classes against pivot vertices (below / above / incomparable) under a charging scheme
+that lets each edge pay for O(1) splits amortised; (ii) recover the tree from that permutation in
+one stack-based bracketing scan, then label each node series/parallel/prime from one child pair.
+References: McConnell & Spinrad 1999 (with transitive orientation; the paper's citation) and
+Cournier & Habib 1994 for the first linear-time constructions; Tedder, Corneil, Habib & Paul 2008
+for a substantially simpler linear-time algorithm; for posets one may also run the undirected
+algorithm on the comparability graph (poset modules = comparability-graph modules) and orient the
+series nodes afterwards; the series-parallel special case has a direct linear-time algorithm
+(Valdes, Tarjan & Lawler 1982). Caveats: "linear" means O(n + m) in the CLOSED comparability
+relation (this package's `Poset` stores the transitive closure, so linear-in-input is the honest
+reading; from a Hasse diagram the closure must be built first), and the repeated-label prime
+canonical form is a separate cost (factorial in the prime's size; primes are small). The naive
+recursion is deliberate here: block-scale posets are tiny, the code is transparently checkable,
+and the asymptotic claim in the paper rests on the literature algorithms, not on this file.
 """
 from __future__ import annotations
 
