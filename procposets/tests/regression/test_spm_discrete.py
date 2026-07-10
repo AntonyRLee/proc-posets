@@ -76,8 +76,11 @@ def test_hybrid_monotone_in_overlap():
     assert disc_angle(N_BASE, N_BASE, refine=True)[0] < 1e-12          # identical primes -> 0
 
 
-def test_hybrid_leaves_sp_unchanged():
-    # the refinement touches only primes; on SP models hybrid == atomic
+def test_prime_only_refinement_leaves_sp_unchanged():
+    # refine={"prime"} touches only primes; on prime-free (SP) models it equals atomic exactly.
+    # (refine=True is the FULL refined family of the paper's Remark V.1 and additionally fans
+    # parallel blocks out over typed element atoms -- pinned in test_refinement.py.)
     conc = one(then(leaf("a"), par(leaf("b"), leaf("c"))))
     seq = one(then(leaf("a"), leaf("b"), leaf("c")))
-    assert math.isclose(disc_angle(conc, seq, refine=True)[0], disc_angle(conc, seq, refine=False)[0])
+    assert math.isclose(disc_angle(conc, seq, refine={"prime"})[0],
+                        disc_angle(conc, seq, refine=False)[0])

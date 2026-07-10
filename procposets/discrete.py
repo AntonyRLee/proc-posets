@@ -23,6 +23,13 @@ Block family (compare the TILING / block transitions) -- the three weightings
                          uniform over traces (each variant weighted by its number of linear extensions).
 
 All three feed the block-SMD; comparing them and the Kemeny family is the point of demo/08_discrete_comparison.
+
+Refined family (fan-out) -- ``disc_angle``
+------------------------------------------
+The paper's Remark V.1: prime blocks fan out over covering-relation atoms, parallel blocks over
+typed element atoms, uniform splits, the SMD unchanged. Everything else in this package stays
+atomic (the paper's default). See the comment block above ``disc_angle`` for the conventions,
+the closed form, and the defaults; pins in ``tests/test_refinement.py``.
 """
 from __future__ import annotations
 
@@ -31,7 +38,7 @@ from itertools import combinations
 
 from .distance import _augment
 from .matrix import END, START, build
-from .moddecomp import Prime, Series, decompose
+from .moddecomp import Parallel, Prime, Series, decompose
 from .poset import Poset
 from .poset import count_extensions
 from .traces import linear_extensions
@@ -147,13 +154,34 @@ def block_angle(m1, m2, weighting="uniform_variant", context_depth=1):
     return _matrix_angle(a1, a2, states)
 
 
-# ------------------------------------------------------ prime-gradation hybrid (fan-out)
-# Prime blocks are atomic in the block alphabet, so two distinct primes are all-or-nothing (P3, the
-# 'coarser inside a prime' limitation). The fan-out refinement makes the transition INTO a prime spread
-# uniformly over the prime's Hasse-edge relation-atoms (as intermediate states) before reconverging on
-# the block that follows. Two primes then SHARE the relation-atoms they have in common, so the ordinary
-# row-Bhattacharyya grades them by relation overlap -- relation-aware inside primes, tiling-aware on the
-# series-parallel part (which is untouched). Distinct labels within a prime are assumed (v1 caveat).
+# ------------------------------------------------------ the refined family (fan-out)
+# Atomic blocks are all-or-nothing: two distinct primes, or two distinct parallel blocks, differ
+# maximally however much structure they share. The fan-out refinement (paper, Remark V.1) replaces
+# the transition INTO such a block by a uniform spread over the block's atoms as TYPED intermediate
+# states, reconverging on the block that follows. Two blocks then share the atoms they have in
+# common, and the ordinary row-Bhattacharyya grades them by overlap; the SMD formula, the sink
+# convention, and the series-parallel part of the comparison are untouched.
+#
+# Conventions (each the paper's declared choice, stated where it acts):
+#   * atoms per block type -- PRIME: labelled covering (Hasse) relations "x<y", the poset's unique
+#     irredundant generating set; PARALLEL: the child modules' canonical symbols, typed "sym||"
+#     (an antichain has no covering relations, so its gradable content is its element multiset);
+#   * mass split -- uniform over the atoms: the same maximum-entropy convention as the
+#     uniform-linear-extension law and the uniform-prior weighting;
+#   * typed states -- a relation atom "x<y" or an element atom "x||" can never collide with a
+#     block symbol, so refining cannot merge a concurrency with its interleavings;
+#   * the distance is unchanged -- the refined object feeds the same row-Bhattacharyya SMD, with
+#     the same sink-and-reset closure on the union state space.
+# Closed form for an isolated pair of same-kind blocks with atom multisets A, A':
+#     d = 2*arccos(|A & A'| / sqrt(|A| * |A'|)),
+# the angular (Ochiai) set similarity. Between totally parallel models this coincides with the
+# Bhattacharyya angle on the uniform activity distributions (the activity-marginal comparison).
+#
+# DEFAULTS: everything else in this package is atomic -- `matrix.build`, `distance.smd`, and
+# `block_angle` never refine (the paper's default comparison object). `disc_angle` is the refined
+# family's entry point: refine=True enables both instantiations, refine={"prime"} / {"parallel"}
+# one of them, refine=False none (atomic). Depth-1 only; distinct labels within a prime assumed
+# (v1 caveat).
 
 
 def _covers(P: Poset):
@@ -162,22 +190,45 @@ def _covers(P: Poset):
 
 
 def _prime_atoms(prime: Prime):
-    """The Hasse-edge relation-atoms 'x<y' of a prime block (its shared/graded pieces)."""
+    """The labelled covering-relation atoms 'x<y' of a prime block (its shared/graded pieces)."""
     P = prime.poset
     return sorted(f"{P.labels[u]}<{P.labels[v]}" for (u, v) in _covers(P))
 
 
+def _parallel_atoms(block: Parallel):
+    """The typed element atoms 'sym||' of a parallel block: its child modules' canonical symbols."""
+    return sorted(f"{c.canonical()}||" for c in block.parts)
+
+
 def _block_items(tree):
-    """A normal form as a list of items: ('block', symbol) or ('prime', [relation-atoms])."""
+    """A normal form as (kind, atoms, atomic_symbol) items, kind in {'block','prime','parallel'}."""
     def item(node):
         if isinstance(node, Prime):
-            return ("prime", _prime_atoms(node))
-        return ("block", node.canonical())
+            atoms = _prime_atoms(node)
+            return ("prime", atoms, "(" + "*".join(atoms) + ")")
+        if isinstance(node, Parallel):
+            return ("parallel", _parallel_atoms(node), node.canonical())
+        return ("block", None, node.canonical())
     return [item(c) for c in tree.parts] if isinstance(tree, Series) else [item(tree)]
 
 
-def _build_refined(model, refine: bool):
-    """Depth-1 block matrix in which primes are fanned out over their relation-atoms (if refine)."""
+_REFINE_KINDS = frozenset({"prime", "parallel"})
+
+
+def _normalise_refine(refine):
+    if refine is True:
+        return set(_REFINE_KINDS)
+    if not refine:
+        return set()
+    kinds = {refine} if isinstance(refine, str) else set(refine)
+    unknown = kinds - _REFINE_KINDS
+    if unknown:
+        raise ValueError(f"unknown refine kinds {sorted(unknown)}; allowed: 'prime', 'parallel'")
+    return kinds
+
+
+def _build_refined(model, kinds: set):
+    """Depth-1 block matrix in which blocks of the selected `kinds` fan out over their atoms."""
     raw: dict = {}
     states = {START, END}
 
@@ -187,21 +238,22 @@ def _build_refined(model, refine: bool):
 
     for P, w in model:
         frontier = {START: float(w)}                       # active source states -> mass
-        for kind, payload in _block_items(decompose(P)):
+        for kind, atoms, sym in _block_items(decompose(P)):
             total = sum(frontier.values())
-            if kind == "block" or not refine:
-                sym = payload if kind == "block" else "(" + "*".join(payload) + ")"  # atomic prime
+            if kind == "block" or kind not in kinds:       # atomic step
                 for s, m in frontier.items():
                     add(s, sym, m)
                 states.add(sym)
                 frontier = {sym: total}
-            else:                                          # prime fan-out over relation-atoms
-                atoms = payload or ["<empty>"]
+            else:                                          # fan-out over the block's atoms
+                atoms = atoms or ["<empty>"]
                 for s, m in frontier.items():
                     for a in atoms:
                         add(s, a, m / len(atoms))
                 states.update(atoms)
-                frontier = {a: total / len(atoms) for a in atoms}
+                frontier = {}
+                for a in atoms:                            # multiset-safe reconvergence mass
+                    frontier[a] = frontier.get(a, 0.0) + total / len(atoms)
         for s, m in frontier.items():
             add(s, END, m)
     matrix = {s: {t: v / sum(row.values()) for t, v in row.items()} for s, row in raw.items()}
@@ -209,8 +261,18 @@ def _build_refined(model, refine: bool):
 
 
 def disc_angle(m1, m2, refine=True):
-    """Discrete block-SMD with the prime fan-out on (refine=True) or off (refine=False = atomic primes)."""
-    b1, s1 = _build_refined(m1, refine)
-    b2, s2 = _build_refined(m2, refine)
+    """Block-SMD with the fan-out refinement of the paper's Remark V.1.
+
+    refine=True        -- the full refined family: primes fan out over covering-relation atoms,
+                          parallel blocks over typed element atoms.
+    refine={"prime"} or {"parallel"} -- one instantiation only ({"prime"} reproduces the earlier
+                          prime-only behaviour exactly).
+    refine=False       -- atomic blocks throughout (the paper's default comparison).
+    The SMD row formula, the sink-and-reset closure, and the union state space are identical in
+    every mode; only the state space changes. Isolated same-kind block pairs obey the closed form
+    2*arccos(|A & A'|/sqrt(|A||A'|)) over their atom multisets."""
+    kinds = _normalise_refine(refine)
+    b1, s1 = _build_refined(m1, kinds)
+    b2, s2 = _build_refined(m2, kinds)
     states = sorted(s1 | s2)
     return _matrix_angle(_augment(b1, states), _augment(b2, states), states)

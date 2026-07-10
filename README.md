@@ -5,6 +5,45 @@ estimation and comparison core for process-mining research — the shared
 library behind three research repos that previously duplicated and
 `sys.path`-shimmed each other's code.
 
+## Defaults and conventions (state space & the SMD)
+
+These are the conventions every comparison in this package uses, stated once
+(they mirror "the construction, end to end" in the geometry paper, §IV, and
+its Remark V.1):
+
+- **State space (canonical, no choice).** A model — a weighted list of
+  labelled posets (its variants) — is tiled by the total modular
+  decomposition, which is *unique*: the block alphabet (leaves, parallel
+  blocks, primes; concurrency stays one atomic token) is canonical. States
+  are the block symbols joined into order-`context_depth` windows
+  (`matrix.build`; depth 1 = memoryless default — the paper's faithful
+  default is depth maximal for the signature, which consumers pass
+  explicitly), plus the bare sentinels `START` (γ₁) and `END` (γ₂).
+- **P matrices.** Each variant's block word traces a path through the states;
+  variant weights are spread along the paths, summed, and each row
+  normalised. Closure (`distance.NORMALISATION = "sink"`, the default): a
+  state with no outgoing mass routes to `END`, and `END` resets to `START`,
+  so every model is a genuine γ₁→γ₂ generative chain on any common state
+  space; `"selfloop"` is the distance-paper alternative.
+- **The SMD.** `distance.smd`: rows are compared by the Bhattacharyya angle
+  on the union state space, `d = 2·sqrt(Σ_rows arccos² BC)`. The raw value is
+  extensive (it grows with the number of differing rows); `normalize=True`
+  applies the Result-4 `1/sqrt(|X|)` factor (root-mean-square row angle,
+  bounded by π) — use it whenever the two objects can differ in state-space
+  size.
+- **Refinement (off everywhere by default).** `matrix.build`, `distance.smd`
+  and `discrete.block_angle` are always atomic — the paper's default
+  comparison object. `discrete.disc_angle(refine=...)` is the refined
+  family's entry point (paper, Remark V.1): primes fan out over their
+  labelled covering-relation atoms `"x<y"`, parallel blocks over typed
+  element atoms `"sym||"`, with uniform (maximum-entropy) splits, typed
+  intermediate states, and the SMD formula unchanged. `refine=True` enables
+  both instantiations; `refine={"prime"}` / `{"parallel"}` selects one;
+  `refine=False` is atomic. Isolated same-kind block pairs obey the closed
+  form `2·arccos(|A∩A′|/sqrt(|A||A′|))`; between totally parallel models the
+  refined SMD coincides with the Bhattacharyya angle on activity sets (the
+  activity-marginal comparison). Pinned in `tests/test_refinement.py`.
+
 ## Layers (install what you need)
 
 The core is **dependency-free** (Python ≥3.10, no third-party packages);
