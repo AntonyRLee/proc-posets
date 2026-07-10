@@ -85,3 +85,75 @@ def test_refine_kind_selection_and_backcompat():
 def test_refine_rejects_unknown_kind():
     with pytest.raises(ValueError):
         disc_angle(N_BASE, N_BASE, refine={"loop"})
+
+
+# ---- occurrence collisions, exactness (strict), and the faithful depth --------------------
+
+N2 = from_dag([("e", "g"), ("f", "g"), ("e", "h")])
+
+
+def _DB():
+    return one(then(leaf("a"), par(leaf("b"), leaf("d")), N2, leaf("z")))
+
+
+def _DBp():
+    # D_B' = a ; (b x d) ; N2 ; (b x b x d) ; z : atom names b||, d|| recur across two blocks
+    return one(then(leaf("a"), par(leaf("b"), leaf("d")), N2,
+                    par(leaf("b"), leaf("b"), leaf("d")), leaf("z")))
+
+
+def _DE():
+    # same skeleton, final block (b x d): graded against _DBp at the faithful depth
+    return one(then(leaf("a"), par(leaf("b"), leaf("d")), N2,
+                    par(leaf("b"), leaf("d")), leaf("z")))
+
+
+def test_strict_default_refuses_occurrence_collision():
+    with pytest.raises(ValueError):
+        disc_angle(_DBp(), _DBp())                       # depth 1: b||/d|| recur -> exactness lost
+
+
+def test_relaxed_merge_is_the_declared_fallback():
+    from procposets.discrete import _build_refined
+    rm, _ = _build_refined(_DBp(), {"prime", "parallel"}, context_depth=1, strict=False)
+    assert math.isclose(rm["b||"]["z"], 4 / 7, rel_tol=1e-12)      # mixed-context row
+    assert math.isclose(rm["d||"]["z"], 2 / 5, rel_tol=1e-12)
+    assert disc_angle(_DBp(), _DBp(), strict=False)[0] < 1e-12     # identical models still 0
+
+
+def test_faithful_depth_two_is_exact_and_acyclic():
+    from procposets.discrete import _build_refined
+    rm, _ = _build_refined(_DBp(), {"prime", "parallel"}, context_depth=2)   # no raise
+    assert math.isclose(rm["a|b||"]["(b * d)|e<g"], 1 / 3, rel_tol=1e-12)
+    par2 = rm["(b * d)|e<g"]                                       # fan into the final block
+    assert math.isclose(par2["N{e<g, e<h, f<g}|b||"], 2 / 3, rel_tol=1e-12)
+    assert math.isclose(par2["N{e<g, e<h, f<g}|d||"], 1 / 3, rel_tol=1e-12)
+    # acyclic apart from the reset: no state reachable from itself through the body
+    assert disc_angle(_DBp(), _DBp(), context_depth=2)[0] < 1e-12
+
+
+def test_graded_comparison_at_faithful_depth():
+    # final blocks (b,b,d) vs (b,d): the three fan rows carry the multiplicity coefficient,
+    # the two second-occurrence atom rows differ maximally (different following window)
+    bc = math.sqrt(1 / 3) + math.sqrt(1 / 6)
+    expect = 2 * math.sqrt(3 * math.acos(bc) ** 2 + 2 * (math.pi / 2) ** 2)
+    assert math.isclose(disc_angle(_DBp(), _DE(), context_depth=2)[0], expect, rel_tol=1e-9)
+
+
+def test_insertion_at_faithful_depth():
+    # D_B vs D_B': one inserted block; refined pi*sqrt(5), atomic (build, depth 2) pi*sqrt(2)
+    assert math.isclose(disc_angle(_DB(), _DBp(), context_depth=2)[0],
+                        math.pi * math.sqrt(5), rel_tol=1e-9)
+    from procposets.distance import smd_rows
+    from procposets.matrix import build
+    d_atomic = smd_rows(build(_DB(), 2), build(_DBp(), 2))[0]
+    assert math.isclose(d_atomic, math.pi * math.sqrt(2), rel_tol=1e-9)
+
+
+def test_repeated_label_multiplicity_closed_form():
+    # isolated (b x b x d) vs (b x d): BC = sum sqrt(m m') / sqrt(|A||A'|) = (sqrt2+1)/sqrt6,
+    # NOT the multiset-count form 2/sqrt6 (which overstates the distance)
+    d = disc_angle(one(par(leaf("b"), leaf("b"), leaf("d"))),
+                   one(par(leaf("b"), leaf("d"))))[0]
+    assert math.isclose(d, 2 * math.acos((math.sqrt(2) + 1) / math.sqrt(6)), rel_tol=1e-9)
+    assert not math.isclose(d, 2 * math.acos(2 / math.sqrt(6)), rel_tol=1e-3)

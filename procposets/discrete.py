@@ -204,8 +204,7 @@ def _block_items(tree):
     """A normal form as (kind, atoms, atomic_symbol) items, kind in {'block','prime','parallel'}."""
     def item(node):
         if isinstance(node, Prime):
-            atoms = _prime_atoms(node)
-            return ("prime", atoms, "(" + "*".join(atoms) + ")")
+            return ("prime", _prime_atoms(node), node.canonical())
         if isinstance(node, Parallel):
             return ("parallel", _parallel_atoms(node), node.canonical())
         return ("block", None, node.canonical())
@@ -227,8 +226,19 @@ def _normalise_refine(refine):
     return kinds
 
 
-def _build_refined(model, kinds: set):
-    """Depth-1 block matrix in which blocks of the selected `kinds` fan out over their atoms."""
+def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True):
+    """Block matrix in which blocks of the selected `kinds` fan out over their atoms.
+
+    `context_depth` types every state by its preceding block context, mirroring matrix.build's
+    windows: an unrefined block at depth k occupies the '|'-joined window of the last <=k block
+    symbols; a fan-out atom is typed by the last <=k-1 PRECEDING block symbols plus the atom name
+    (at k=1 the context is empty, so atoms are global -- shared across blocks and models, the
+    maximally graded reading). `strict=True` (the default) enforces EXACTNESS: if any state recurs
+    within a single variant at the chosen depth -- the occurrence collision that merges rows and
+    admits spurious trajectories -- a ValueError names the state; raise context_depth for the
+    faithful chain, or pass strict=False to accept the merge as the declared robustness relaxation
+    (the refined analogue of lowering the memory depth in the atomic chain)."""
+    k = max(1, context_depth)
     raw: dict = {}
     states = {START, END}
 
@@ -238,29 +248,43 @@ def _build_refined(model, kinds: set):
 
     for P, w in model:
         frontier = {START: float(w)}                       # active source states -> mass
+        visited: set = set()                               # states this variant has occupied
+        ctx: list = []                                     # block symbols emitted so far
         for kind, atoms, sym in _block_items(decompose(P)):
             total = sum(frontier.values())
-            if kind == "block" or kind not in kinds:       # atomic step
-                for s, m in frontier.items():
-                    add(s, sym, m)
-                states.add(sym)
-                frontier = {sym: total}
-            else:                                          # fan-out over the block's atoms
+            prefix = ctx[-(k - 1):] if k > 1 else []
+            if kind == "block" or kind not in kinds:       # atomic step: standard window state
+                win = "|".join((ctx + [sym])[-k:])
+                targets = {win: 1.0}                       # each source sends all its mass
+                new_frontier = {win: total}
+            else:                                          # fan-out over context-typed atoms
                 atoms = atoms or ["<empty>"]
-                for s, m in frontier.items():
-                    for a in atoms:
-                        add(s, a, m / len(atoms))
-                states.update(atoms)
-                frontier = {}
-                for a in atoms:                            # multiset-safe reconvergence mass
-                    frontier[a] = frontier.get(a, 0.0) + total / len(atoms)
+                targets = {}
+                for a in atoms:                            # multiset-safe: duplicates accumulate
+                    st = "|".join(prefix + [a])
+                    targets[st] = targets.get(st, 0.0) + 1.0 / len(atoms)
+                new_frontier = {st: f * total for st, f in targets.items()}
+            hit = set(new_frontier) & visited
+            if hit and strict:
+                raise ValueError(
+                    f"state {sorted(hit)[0]!r} recurs within one variant at "
+                    f"context_depth={k}: rows would merge and the chain would admit spurious "
+                    "trajectories. Increase context_depth (the faithful default), or pass "
+                    "strict=False to accept the merge as a declared robustness relaxation.")
+            visited |= set(new_frontier)
+            for s, m in frontier.items():
+                for st, f in targets.items():
+                    add(s, st, m * f)
+            states.update(new_frontier)
+            frontier = new_frontier
+            ctx.append(sym)
         for s, m in frontier.items():
             add(s, END, m)
     matrix = {s: {t: v / sum(row.values()) for t, v in row.items()} for s, row in raw.items()}
     return matrix, states
 
 
-def disc_angle(m1, m2, refine=True):
+def disc_angle(m1, m2, refine=True, context_depth=1, strict=True):
     """Block-SMD with the fan-out refinement of the paper's Remark V.1.
 
     refine=True        -- the full refined family: primes fan out over covering-relation atoms,
@@ -268,11 +292,16 @@ def disc_angle(m1, m2, refine=True):
     refine={"prime"} or {"parallel"} -- one instantiation only ({"prime"} reproduces the earlier
                           prime-only behaviour exactly).
     refine=False       -- atomic blocks throughout (the paper's default comparison).
+    context_depth      -- memory depth for the refined states (atoms typed by their preceding
+                          block context); pick the faithful depth for the models compared.
+    strict=True        -- exact by default: refuse to merge recurring states within a variant
+                          (ValueError); strict=False accepts the merge (declared relaxation).
     The SMD row formula, the sink-and-reset closure, and the union state space are identical in
     every mode; only the state space changes. Isolated same-kind block pairs obey the closed form
-    2*arccos(|A & A'|/sqrt(|A||A'|)) over their atom multisets."""
+    2*arccos(sum_x sqrt(m(x) m'(x)) / sqrt(|A||A'|)) over their atom multisets with multiplicities
+    m; for equal shared multiplicities this is 2*arccos(|A & A'|/sqrt(|A||A'|))."""
     kinds = _normalise_refine(refine)
-    b1, s1 = _build_refined(m1, kinds)
-    b2, s2 = _build_refined(m2, kinds)
+    b1, s1 = _build_refined(m1, kinds, context_depth, strict)
+    b2, s2 = _build_refined(m2, kinds, context_depth, strict)
     states = sorted(s1 | s2)
     return _matrix_angle(_augment(b1, states), _augment(b2, states), states)

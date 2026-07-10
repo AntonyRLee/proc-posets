@@ -39,8 +39,17 @@ its Remark V.1):
   element atoms `"sym||"`, with uniform (maximum-entropy) splits, typed
   intermediate states, and the SMD formula unchanged. `refine=True` enables
   both instantiations; `refine={"prime"}` / `{"parallel"}` selects one;
-  `refine=False` is atomic. Isolated same-kind block pairs obey the closed
-  form `2·arccos(|A∩A′|/sqrt(|A||A′|))`; between totally parallel models the
+  `refine=False` is atomic. Refined states carry the same memory windows as
+  atomic ones (`context_depth`: an atom is typed by its preceding block
+  context — global at depth 1), and **exactness is enforced by default**: a
+  state recurring within one variant raises (`strict=True`) rather than
+  silently merging rows into a chain with spurious trajectories; raise the
+  depth for the faithful chain, or pass `strict=False` to accept the merge
+  as the paper's declared robustness relaxation. Isolated same-kind block
+  pairs obey, over atom multiplicities m, the closed
+  form `2·arccos(Σ sqrt(m·m')/sqrt(|A||A'|))` (the count form
+  `|A∩A'|/sqrt(|A||A'|)` when shared multiplicities are equal); between
+  totally parallel models the
   refined SMD coincides with the Bhattacharyya angle on activity sets (the
   activity-marginal comparison). Pinned in `tests/test_refinement.py`.
 
