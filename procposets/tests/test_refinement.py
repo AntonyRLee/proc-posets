@@ -198,6 +198,16 @@ def test_recursive_identical_nested_is_zero():
     assert disc_angle(m, m, recursive=True)[0] < 1e-12
 
 
+def test_normalize_is_result4_factor():
+    # normalize=True divides by sqrt(|union state space|), exactly as smd(normalize=True)
+    from procposets.discrete import _build_refined
+    d_raw = disc_angle(N_BASE, N_SHARE2)[0]
+    d_norm = disc_angle(N_BASE, N_SHARE2, normalize=True)[0]
+    _, s1 = _build_refined(N_BASE, {"prime", "parallel"})
+    _, s2 = _build_refined(N_SHARE2, {"prime", "parallel"})
+    assert math.isclose(d_norm, d_raw / math.sqrt(len(s1 | s2)), rel_tol=1e-12)
+
+
 # ---- E2 relational ladder (chain_k; paper App C "Outlook") --------------------------------
 
 

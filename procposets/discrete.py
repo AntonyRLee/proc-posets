@@ -374,7 +374,8 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
     return matrix, states
 
 
-def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=False, chain_k=2):
+def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=False, chain_k=2,
+               normalize=False):
     """Block-SMD with the fan-out refinement of the paper's Remark V.1.
 
     refine=True        -- the full refined family: primes fan out over covering-relation atoms,
@@ -396,6 +397,11 @@ def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=Fals
                           ('x<'). The default 2 is the covers -- the historical behaviour,
                           exactly. Applies to primes wherever they occur, including disclosed
                           ones under recursive=True.
+    normalize=False    -- divide by sqrt(|X|) of the pair's union state space: the distance
+                          paper's Result-4 factor, identical to smd(normalize=True). The raw SMD
+                          is extensive (grows with the number of differing rows), so refined
+                          objects, which have MORE states, are metrically bigger, noise included;
+                          normalise whenever compared objects differ in state-space size.
     The SMD row formula, the sink-and-reset closure, and the union state space are identical in
     every mode; only the state space changes. Isolated same-kind block pairs obey the closed form
     2*arccos(sum_x sqrt(m(x) m'(x)) / sqrt(|A||A'|)) over their atom multisets with multiplicities
@@ -405,4 +411,7 @@ def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=Fals
     b1, s1 = _build_refined(m1, kinds, context_depth, strict, recursive, chain_k)
     b2, s2 = _build_refined(m2, kinds, context_depth, strict, recursive, chain_k)
     states = sorted(s1 | s2)
-    return _matrix_angle(_augment(b1, states), _augment(b2, states), states)
+    d, per = _matrix_angle(_augment(b1, states), _augment(b2, states), states)
+    if normalize:
+        d /= math.sqrt(len(states))
+    return d, per
