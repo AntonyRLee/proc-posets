@@ -198,6 +198,48 @@ def test_recursive_identical_nested_is_zero():
     assert disc_angle(m, m, recursive=True)[0] < 1e-12
 
 
+# ---- E2 relational ladder (chain_k; paper App C "Outlook") --------------------------------
+
+
+def test_chain_default_is_covers_exactly():
+    for m1, m2 in [(N_BASE, N_SHARE2), (N_BASE, N_DISJOINT)]:
+        assert disc_angle(m1, m2, chain_k=2)[0] == disc_angle(m1, m2)[0]
+
+
+def test_chain_k1_is_membership_only():
+    # rung 1 alone: two distinct primes on the same elements tie at 0 (declared lossy rung),
+    # and typed 'x<' atoms do not collide with a parallel block's 'x||' atoms
+    assert disc_angle(N_BASE, N_SHARE2, chain_k=1)[0] < 1e-12
+    same_elems = anti(["a", "b", "c", "d"])
+    assert disc_angle(N_BASE, same_elems, chain_k=1)[0] > 1.5
+
+
+def test_chain_k3_grades_deep_structure():
+    # two 5-element height-3 primes; chains 'x<y<z' grade, and the union rung {2,3} matches the
+    # closed form over the combined multisets. P1 k3 = {c<a<b, d<a<b}; P2 k3 = {c<a<b}.
+    P1 = from_dag([("a", "b"), ("c", "a"), ("c", "e"), ("d", "a")])
+    P2 = from_dag([("a", "b"), ("c", "a"), ("c", "e"), ("d", "b")])
+    assert math.isclose(disc_angle(one(P1), one(P2), chain_k=3)[0], closed(1, 2, 1), rel_tol=1e-9)
+    # covers share 3 of 4|4; union {2,3}: 4 shared of 6|5
+    assert math.isclose(disc_angle(one(P1), one(P2), chain_k={2, 3})[0],
+                        closed(4, 6, 5), rel_tol=1e-9)
+
+
+def test_chain_rung_above_height_raises():
+    with pytest.raises(ValueError):
+        disc_angle(N_BASE, N_SHARE2, chain_k=3)          # N has height 2: no 3-chains
+    disc_angle(N_BASE, N_SHARE2, chain_k={2, 3})         # union with rung 2 is fine
+
+
+def test_chain_k_applies_to_disclosed_primes():
+    # a prime nested inside a parallel block is disclosed under recursive=True with the same rungs:
+    # atoms {N||, x||, c<a<b, d<a<b} vs {N'||, x||, c<a<b} -> shared {x||, c<a<b} = 2 of 4|3
+    m1 = one(par(from_dag([("a", "b"), ("c", "a"), ("c", "e"), ("d", "a")]), leaf("x")))
+    m2 = one(par(from_dag([("a", "b"), ("c", "a"), ("c", "e"), ("d", "b")]), leaf("x")))
+    assert math.isclose(disc_angle(m1, m2, recursive=True, chain_k=3)[0],
+                        closed(2, 4, 3), rel_tol=1e-9)
+
+
 def test_repeated_label_multiplicity_closed_form():
     # isolated (b x b x d) vs (b x d): BC = sum sqrt(m m') / sqrt(|A||A'|) = (sqrt2+1)/sqrt6,
     # NOT the multiset-count form 2/sqrt6 (which overstates the distance)

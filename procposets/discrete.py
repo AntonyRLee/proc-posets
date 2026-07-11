@@ -207,10 +207,46 @@ def _covers(P: Poset):
             if not any((u, w) in P.less and (w, v) in P.less for w in P.elements)}
 
 
-def _prime_atoms(prime: Prime):
-    """The labelled covering-relation atoms 'x<y' of a prime block (its shared/graded pieces)."""
+def _prime_atoms(prime: Prime, chain_k=2):
+    """The labelled chain atoms of a prime block (E2 relational ladder; default = the covers).
+
+    `chain_k` selects the rung(s): an int or an iterable of ints. Rung k >= 2 contributes every
+    directed path on k vertices of the transitive reduction, named 'x1<x2<...<xk'; rung k = 1 is
+    the membership rung, one typed atom 'x<' per element (the trailing '<' marks a length-one
+    chain, so it collides with neither an activity block nor an element atom 'x||'). Rungs are
+    unioned, multiset-preserving. chain_k=2 is exactly the covering relations (the default and the
+    paper's headline convention). CAVEATS, declared: rung 1 alone is membership-only (two distinct
+    primes on the same elements tie at 0), and a rung k exceeding the prime's height contributes
+    nothing -- if the selected rungs contribute nothing at all, a ValueError names the block
+    (include rung 2 to be safe)."""
     P = prime.poset
-    return sorted(f"{P.labels[u]}<{P.labels[v]}" for (u, v) in _covers(P))
+    ks = {chain_k} if isinstance(chain_k, int) else set(chain_k)
+    if any(k < 1 for k in ks):
+        raise ValueError(f"chain_k rungs must be >= 1, got {sorted(ks)}")
+    succ: dict = {}
+    for (u, v) in _covers(P):
+        succ.setdefault(u, []).append(v)
+    out: list = []
+    for k in sorted(ks):
+        if k == 1:
+            out += [f"{P.labels[e]}<" for e in P.elements]
+            continue
+
+        def extend(path):
+            if len(path) == k:
+                out.append("<".join(P.labels[x] for x in path))
+                return
+            for nxt in succ.get(path[-1], []):
+                extend(path + [nxt])
+
+        for e in P.elements:
+            extend([e])
+    if not out:
+        raise ValueError(
+            f"prime block {prime.canonical()!r} has no chains at rungs {sorted(ks)} "
+            "(rung exceeds the prime's height); include rung 2, e.g. chain_k={2, "
+            f"{max(ks)}}}.")
+    return sorted(out)
 
 
 def _parallel_atoms(block: Parallel):
@@ -218,41 +254,42 @@ def _parallel_atoms(block: Parallel):
     return sorted(f"{c.canonical()}||" for c in block.parts)
 
 
-def _module_content(node):
+def _module_content(node, chain_k=2):
     """One level of a composite module's canonical content (the E1 disclosure of `node` itself):
-    consecutive covers for a series module, typed element symbols for a parallel module, labelled
-    covers for a prime. A leaf has no content."""
+    consecutive covers for a series module, typed element symbols for a parallel module, chain
+    atoms for a prime (E2 rungs apply to primes wherever they occur). A leaf has no content."""
     if isinstance(node, Parallel):
         return [f"{c.canonical()}||" for c in node.parts]
     if isinstance(node, Series):
         syms = [c.canonical() for c in node.parts]
         return [f"{syms[i]}<{syms[i + 1]}" for i in range(len(syms) - 1)]
     if isinstance(node, Prime):
-        return _prime_atoms(node)
+        return _prime_atoms(node, chain_k)
     return []
 
 
-def _disclosure(node):
+def _disclosure(node, chain_k=2):
     """Flattened E1 disclosure below `node`: the content of every composite descendant module,
     multiset-preserving (duplicated children disclose duplicated atoms)."""
     out: list = []
     for c in node.children:
-        sub = _module_content(c)
+        sub = _module_content(c, chain_k)
         if sub:
-            out += sub + _disclosure(c)
+            out += sub + _disclosure(c, chain_k)
     return out
 
 
-def _block_items(tree, recursive: bool = False):
+def _block_items(tree, recursive: bool = False, chain_k=2):
     """A normal form as (kind, atoms, atomic_symbol) items, kind in {'block','prime','parallel'}.
     With recursive=True the atoms of a refined block are augmented by its E1 disclosure; blocks
-    whose children are all leaves are unchanged (flat invariance)."""
+    whose children are all leaves are unchanged (flat invariance). `chain_k` selects the E2
+    rung(s) for prime atoms (default 2 = covers, the historical behaviour, exactly)."""
     def item(node):
         if isinstance(node, Prime):
-            atoms = _prime_atoms(node) + (sorted(_disclosure(node)) if recursive else [])
+            atoms = _prime_atoms(node, chain_k) + (sorted(_disclosure(node, chain_k)) if recursive else [])
             return ("prime", atoms, node.canonical())
         if isinstance(node, Parallel):
-            atoms = _parallel_atoms(node) + (sorted(_disclosure(node)) if recursive else [])
+            atoms = _parallel_atoms(node) + (sorted(_disclosure(node, chain_k)) if recursive else [])
             return ("parallel", atoms, node.canonical())
         return ("block", None, node.canonical())
     return [item(c) for c in tree.parts] if isinstance(tree, Series) else [item(tree)]
@@ -274,12 +311,13 @@ def _normalise_refine(refine):
 
 
 def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True,
-                   recursive: bool = False):
+                   recursive: bool = False, chain_k=2):
     """Block matrix in which blocks of the selected `kinds` fan out over their atoms.
 
     `recursive=True` enables the E1 recursive fan-out: refined blocks spread over their atoms
     PLUS the disclosed content of every composite descendant module (see the comment block above);
-    flat blocks are unchanged.
+    flat blocks are unchanged. `chain_k` selects the E2 rung(s) for prime atoms (default 2 =
+    covers, exactly the historical behaviour).
 
     `context_depth` types every state by its preceding block context, mirroring matrix.build's
     windows: an unrefined block at depth k occupies the '|'-joined window of the last <=k block
@@ -302,7 +340,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
         frontier = {START: float(w)}                       # active source states -> mass
         visited: set = set()                               # states this variant has occupied
         ctx: list = []                                     # block symbols emitted so far
-        for kind, atoms, sym in _block_items(decompose(P), recursive):
+        for kind, atoms, sym in _block_items(decompose(P), recursive, chain_k):
             total = sum(frontier.values())
             prefix = ctx[-(k - 1):] if k > 1 else []
             if kind == "block" or kind not in kinds:       # atomic step: standard window state
@@ -336,7 +374,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
     return matrix, states
 
 
-def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=False):
+def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=False, chain_k=2):
     """Block-SMD with the fan-out refinement of the paper's Remark V.1.
 
     refine=True        -- the full refined family: primes fan out over covering-relation atoms,
@@ -352,13 +390,19 @@ def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=Fals
                           disclose the content of composite descendant modules, so shared nested
                           content is graded; flat blocks are bit-identical to recursive=False.
                           Off by default pending the pre-adoption checks (docs/TODO.md).
+    chain_k=2          -- E2 relational ladder (paper App C "Outlook"): the rung(s) of prime
+                          atoms, an int or a set of ints; rung k >= 2 = directed k-vertex paths
+                          of the transitive reduction ('x<y<z'), rung 1 = typed membership
+                          ('x<'). The default 2 is the covers -- the historical behaviour,
+                          exactly. Applies to primes wherever they occur, including disclosed
+                          ones under recursive=True.
     The SMD row formula, the sink-and-reset closure, and the union state space are identical in
     every mode; only the state space changes. Isolated same-kind block pairs obey the closed form
     2*arccos(sum_x sqrt(m(x) m'(x)) / sqrt(|A||A'|)) over their atom multisets with multiplicities
     m; for equal shared multiplicities this is 2*arccos(|A & A'|/sqrt(|A||A'|)); under
     recursive=True the same closed form holds over the disclosure-enlarged multisets."""
     kinds = _normalise_refine(refine)
-    b1, s1 = _build_refined(m1, kinds, context_depth, strict, recursive)
-    b2, s2 = _build_refined(m2, kinds, context_depth, strict, recursive)
+    b1, s1 = _build_refined(m1, kinds, context_depth, strict, recursive, chain_k)
+    b2, s2 = _build_refined(m2, kinds, context_depth, strict, recursive, chain_k)
     states = sorted(s1 | s2)
     return _matrix_angle(_augment(b1, states), _augment(b2, states), states)
