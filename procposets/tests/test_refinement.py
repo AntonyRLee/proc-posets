@@ -150,6 +150,54 @@ def test_insertion_at_faithful_depth():
     assert math.isclose(d_atomic, math.pi * math.sqrt(2), rel_tol=1e-9)
 
 
+# ---- E1 recursive fan-out (paper App C "Outlook"; pre-adoption pins) ----------------------
+
+
+def test_recursive_flat_invariance():
+    # any block whose children are all leaves has no disclosure: recursive=True is bit-identical
+    # to recursive=False on flat primes, flat parallels, and whole flat models
+    for m1, m2 in [(N_BASE, N_SHARE2), (N_BASE, N_DISJOINT),
+                   (anti(["a", "b", "c", "d"]), anti(["a", "b", "u", "v"]))]:
+        assert disc_angle(m1, m2, recursive=True)[0] == disc_angle(m1, m2, recursive=False)[0]
+    assert disc_angle(_DB(), _DBp(), context_depth=2, recursive=True)[0] == \
+        disc_angle(_DB(), _DBp(), context_depth=2, recursive=False)[0]
+
+
+def test_recursive_nested_series_ladder():
+    # (a;b) x (c;d;e): level-1 atoms {(a;b)||, (c;d;e)||} + disclosures {a<b, c<d, d<e} -> 5 atoms
+    base = one(par(then(leaf("a"), leaf("b")), then(leaf("c"), leaf("d"), leaf("e"))))
+    ladder = [
+        (par(then(leaf("a"), leaf("b")), then(leaf("c"), leaf("d"), leaf("e"))), 5),  # identical
+        (par(then(leaf("a"), leaf("b")), then(leaf("c"), leaf("d"), leaf("f"))), 3),  # share c<d
+        (par(then(leaf("a"), leaf("b")), then(leaf("c"), leaf("f"), leaf("g"))), 2),  # branch only
+        (par(then(leaf("f"), leaf("g")), then(leaf("x"), leaf("y"), leaf("z"))), 0),  # disjoint
+    ]
+    prev = -1.0
+    for P, h in ladder:
+        d = disc_angle(base, one(P), recursive=True)[0]
+        assert math.isclose(d, closed(h, 5, 5), rel_tol=1e-9)
+        assert d >= prev
+        prev = d
+    # the flat family cannot credit the shared nested cover: it sees 1 shared atom of 2
+    flat = disc_angle(base, one(ladder[1][0]), recursive=False)[0]
+    assert math.isclose(flat, closed(1, 2, 2), rel_tol=1e-9)
+    assert disc_angle(base, one(ladder[1][0]), recursive=True)[0] < flat
+
+
+def test_recursive_nested_parallel_membership():
+    # ((a x b); c) x d vs ((a x x); c) x d: the shared member a|| of the nested parallel earns
+    # credit through the recursion; atoms are {((a*b);c)||, d||, (a*b)<c, a||, b||} etc.
+    m1 = one(par(then(par(leaf("a"), leaf("b")), leaf("c")), leaf("d")))
+    m2 = one(par(then(par(leaf("a"), leaf("x")), leaf("c")), leaf("d")))
+    assert math.isclose(disc_angle(m1, m2, recursive=True)[0], closed(2, 5, 5), rel_tol=1e-9)
+    assert math.isclose(disc_angle(m1, m2, recursive=False)[0], closed(1, 2, 2), rel_tol=1e-9)
+
+
+def test_recursive_identical_nested_is_zero():
+    m = one(par(then(leaf("a"), leaf("b")), then(leaf("c"), leaf("d"), leaf("e"))))
+    assert disc_angle(m, m, recursive=True)[0] < 1e-12
+
+
 def test_repeated_label_multiplicity_closed_form():
     # isolated (b x b x d) vs (b x d): BC = sum sqrt(m m') / sqrt(|A||A'|) = (sqrt2+1)/sqrt6,
     # NOT the multiset-count form 2/sqrt6 (which overstates the distance)

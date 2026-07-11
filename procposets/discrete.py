@@ -182,6 +182,24 @@ def block_angle(m1, m2, weighting="uniform_variant", context_depth=1):
 # family's entry point: refine=True enables both instantiations, refine={"prime"} / {"parallel"}
 # one of them, refine=False none (atomic). Depth-1 only; distinct labels within a prime assumed
 # (v1 caveat).
+#
+# RECURSIVE FAN-OUT (E1, paper App C "Outlook"; recursive=True, default False -- adoption pending
+# the demo-08 pre-adoption checks in the paper repo's docs/TODO.md): a refined block's atom
+# multiset is augmented with the DISCLOSED CONTENT of every composite descendant module, so shared
+# nested content is credited at every depth. The disclosure of a module is again the canonical
+# content of the paper's statement (iii), one level down:
+#   * series module   -> its consecutive covering relations "sym_i<sym_{i+1}" over its parts'
+#     canonical symbols (the transitive reduction of a chain of modules);
+#   * parallel module -> its parts' canonical symbols as typed element atoms "sym||";
+#   * prime module    -> its labelled covering relations (as at the top level).
+# Level-1 atoms are unchanged, so any block whose children are all leaves (every flat prime and
+# flat parallel block) has EXACTLY the same atoms as recursive=False: the existing validated
+# numbers are invariant, and only nested blocks gain gradation. Membership credit for the leaves
+# of a nested series (the E2 k=1 rung) is deliberately NOT included: a chain's irredundant content
+# is its covers. Relation atoms share one type across nesting (a disclosed series cover "c<d" may
+# meet a prime cover "c<d": both assert the same immediate precedence); element atoms keep the
+# "||" type. The uniform split, the closed form over the (enlarged) multisets, the sink
+# convention, and the SMD formula are untouched -- each disclosure level is again a dilation.
 
 
 def _covers(P: Poset):
@@ -200,13 +218,42 @@ def _parallel_atoms(block: Parallel):
     return sorted(f"{c.canonical()}||" for c in block.parts)
 
 
-def _block_items(tree):
-    """A normal form as (kind, atoms, atomic_symbol) items, kind in {'block','prime','parallel'}."""
+def _module_content(node):
+    """One level of a composite module's canonical content (the E1 disclosure of `node` itself):
+    consecutive covers for a series module, typed element symbols for a parallel module, labelled
+    covers for a prime. A leaf has no content."""
+    if isinstance(node, Parallel):
+        return [f"{c.canonical()}||" for c in node.parts]
+    if isinstance(node, Series):
+        syms = [c.canonical() for c in node.parts]
+        return [f"{syms[i]}<{syms[i + 1]}" for i in range(len(syms) - 1)]
+    if isinstance(node, Prime):
+        return _prime_atoms(node)
+    return []
+
+
+def _disclosure(node):
+    """Flattened E1 disclosure below `node`: the content of every composite descendant module,
+    multiset-preserving (duplicated children disclose duplicated atoms)."""
+    out: list = []
+    for c in node.children:
+        sub = _module_content(c)
+        if sub:
+            out += sub + _disclosure(c)
+    return out
+
+
+def _block_items(tree, recursive: bool = False):
+    """A normal form as (kind, atoms, atomic_symbol) items, kind in {'block','prime','parallel'}.
+    With recursive=True the atoms of a refined block are augmented by its E1 disclosure; blocks
+    whose children are all leaves are unchanged (flat invariance)."""
     def item(node):
         if isinstance(node, Prime):
-            return ("prime", _prime_atoms(node), node.canonical())
+            atoms = _prime_atoms(node) + (sorted(_disclosure(node)) if recursive else [])
+            return ("prime", atoms, node.canonical())
         if isinstance(node, Parallel):
-            return ("parallel", _parallel_atoms(node), node.canonical())
+            atoms = _parallel_atoms(node) + (sorted(_disclosure(node)) if recursive else [])
+            return ("parallel", atoms, node.canonical())
         return ("block", None, node.canonical())
     return [item(c) for c in tree.parts] if isinstance(tree, Series) else [item(tree)]
 
@@ -226,8 +273,13 @@ def _normalise_refine(refine):
     return kinds
 
 
-def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True):
+def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True,
+                   recursive: bool = False):
     """Block matrix in which blocks of the selected `kinds` fan out over their atoms.
+
+    `recursive=True` enables the E1 recursive fan-out: refined blocks spread over their atoms
+    PLUS the disclosed content of every composite descendant module (see the comment block above);
+    flat blocks are unchanged.
 
     `context_depth` types every state by its preceding block context, mirroring matrix.build's
     windows: an unrefined block at depth k occupies the '|'-joined window of the last <=k block
@@ -250,7 +302,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
         frontier = {START: float(w)}                       # active source states -> mass
         visited: set = set()                               # states this variant has occupied
         ctx: list = []                                     # block symbols emitted so far
-        for kind, atoms, sym in _block_items(decompose(P)):
+        for kind, atoms, sym in _block_items(decompose(P), recursive):
             total = sum(frontier.values())
             prefix = ctx[-(k - 1):] if k > 1 else []
             if kind == "block" or kind not in kinds:       # atomic step: standard window state
@@ -284,7 +336,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
     return matrix, states
 
 
-def disc_angle(m1, m2, refine=True, context_depth=1, strict=True):
+def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=False):
     """Block-SMD with the fan-out refinement of the paper's Remark V.1.
 
     refine=True        -- the full refined family: primes fan out over covering-relation atoms,
@@ -296,12 +348,17 @@ def disc_angle(m1, m2, refine=True, context_depth=1, strict=True):
                           block context); pick the faithful depth for the models compared.
     strict=True        -- exact by default: refuse to merge recurring states within a variant
                           (ValueError); strict=False accepts the merge (declared relaxation).
+    recursive=False    -- E1 recursive fan-out (paper App C "Outlook"): refined blocks also
+                          disclose the content of composite descendant modules, so shared nested
+                          content is graded; flat blocks are bit-identical to recursive=False.
+                          Off by default pending the pre-adoption checks (docs/TODO.md).
     The SMD row formula, the sink-and-reset closure, and the union state space are identical in
     every mode; only the state space changes. Isolated same-kind block pairs obey the closed form
     2*arccos(sum_x sqrt(m(x) m'(x)) / sqrt(|A||A'|)) over their atom multisets with multiplicities
-    m; for equal shared multiplicities this is 2*arccos(|A & A'|/sqrt(|A||A'|))."""
+    m; for equal shared multiplicities this is 2*arccos(|A & A'|/sqrt(|A||A'|)); under
+    recursive=True the same closed form holds over the disclosure-enlarged multisets."""
     kinds = _normalise_refine(refine)
-    b1, s1 = _build_refined(m1, kinds, context_depth, strict)
-    b2, s2 = _build_refined(m2, kinds, context_depth, strict)
+    b1, s1 = _build_refined(m1, kinds, context_depth, strict, recursive)
+    b2, s2 = _build_refined(m2, kinds, context_depth, strict, recursive)
     states = sorted(s1 | s2)
     return _matrix_angle(_augment(b1, states), _augment(b2, states), states)
