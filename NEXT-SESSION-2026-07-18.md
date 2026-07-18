@@ -2,10 +2,10 @@
 
 **Branch:** `main` (procposets), `arl/main` (stochastic_process_mining) ·
 **Build/tests:** last-known `334 passed, 13 skipped` (procposets, after the distance fix) ·
-**Uncommitted:** procposets — **N commits ahead of `origin/main`, PUSH STILL PENDING** (classifier kept blocking `git push` — do it manually, see below); 3 untracked drops in `procposets/` (`split-miner*.zip`, `split-miner.md`). Geometry repo — investigation now **committed** (`210fa84`); only a pre-existing `transition.svg` change (not ours) remains unstaged.
+**Uncommitted:** procposets — **pushed to `origin/main` (up to date, `ce527e1`)**; 3 untracked drops in `procposets/` (`split-miner*.zip`, `split-miner.md`) left as-is. Geometry repo — investigation **committed `210fa84` on `arl/main` (local only, NOT pushed)**; only a pre-existing `transition.svg` change (not ours) remains unstaged.
 
 ## Where we are (1–2 sentences)
-Two threads. (1) **procposets**: P1 blocker #1 (fleet-wide constant |X|) fixed + 2 stale goldens retired + this handoff — **committed but NOT pushed** (push was blocked, needs a manual retry). (2) **Geometry repo**: the **Split Miner fabrication investigation** is committed (`210fa84`); root cause nailed, SM2 demo done. Remaining: task #4 (build nemo-91) and #5 (developer contact + paper review).
+Two threads. (1) **procposets**: P1 blocker #1 (fleet-wide constant |X|) fixed + 2 stale goldens retired — **committed AND pushed** (`ce527e1`). (2) **Geometry repo**: the **Split Miner fabrication investigation** is committed (`210fa84`, local on `arl/main`, not pushed); root cause nailed, SM2 demo done. Remaining: task #4 (build nemo-91) and #5 (developer contact + paper review).
 
 ## Done this session
 **procposets (`main`, committed, UNPUSHED):**
@@ -19,16 +19,16 @@ Two threads. (1) **procposets**: P1 blocker #1 (fleet-wide constant |X|) fixed +
 - Root cause NAILED: **(A) inherent** over-pairing on flattened small logs (reference reproduces it); **(B) implementation** — pm4py default `epsilon≈0.1` makes b,c a coin-flip on small samples (epsilon sweep: 0.1→flips, 0.5→stable). **NEW:** pm4py `sm2` broken *even with real timestamps* (over-pairs + misses g‖h; **ARI 0.346 vs hand-rolled SM2 1.000**).
 - Committed: hand-rolled `split_miner2` (with SM1 `checked`-bug fix), all harnesses, raw outputs, `data_intervals/` (start+end SM2 variant), `reference/BUILD.md`. **Reference jar preserved on disk at `sm_investigation/reference/split-miner-1.7.1-all.jar` (44 MB, gitignored).**
 
-## Open decisions / blocked (need the user)
-- **PUSH procposets** — `git push origin main` was blocked ~3× by the auto-mode classifier (transient stage-2 error that didn't clear). Run it manually: from `/home/arl/Research/procposets`, `! git push origin main` (or add a Bash permission rule for push). procposets is N commits ahead.
+## Open decisions (need the user)
+- **Push the geometry commit?** `210fa84` is committed locally on `arl/main` but not pushed (the "push" step this session was procposets only). Push it too, or leave local?
 - **#4 vs #5 next** — user wanted a clean break to resume later; either order fine. The pm4py-on-intervals finding strengthens #5.
 
 ## Next steps — ranked
-1. **Push procposets** (blocked above) — one manual command.
-2. **#4 — Build nemo-91/bpmtk** (2nd reference): no build system / no SM `main`; hand-compile `au.edu.qut…splitminer` vs its `lib/*.jar` under JDK 8 + a tiny XES→BPMN driver. Recipe in `sm_investigation/reference/BUILD.md`. Source differs 192–2976 lines from the fork → may behave differently.
-3. **#5 — Draft the Split Miner developer note** (Augusto et al.), framed as questions: (a) default `epsilon=0.1` instability on small logs, (b) `sm2` over-pairing + missing real overlap concurrency on interval logs. Then review our own §IX exhibit + footnote.
-4. **Reference `-v2` integration** (deferred): jar reports `potential parallelisms: 0` on our interval XES (parses 1043 start+1043 complete but registers no overlap) — date-parse/reader quirk, not an algorithm finding.
-5. **Supplement blocker #2** (geometry `docs/TODO.md` #7): pin `pm4py==2.7.23.1`, re-home repro scripts against the released package. **Blocker #3**: Zenodo DOI — user action (repo URL already wired).
+1. **#4 — Build nemo-91/bpmtk** (2nd reference): no build system / no SM `main`; hand-compile `au.edu.qut…splitminer` vs its `lib/*.jar` under JDK 8 + a tiny XES→BPMN driver. Recipe in `sm_investigation/reference/BUILD.md`. Source differs 192–2976 lines from the fork → may behave differently.
+2. **#5 — Draft the Split Miner developer note** (Augusto et al.), framed as questions: (a) default `epsilon=0.1` instability on small logs, (b) `sm2` over-pairing + missing real overlap concurrency on interval logs. Then review our own §IX exhibit + footnote.
+3. **Reference `-v2` integration** (deferred): jar reports `potential parallelisms: 0` on our interval XES (parses 1043 start+1043 complete but registers no overlap) — date-parse/reader quirk, not an algorithm finding.
+4. **Supplement blocker #2** (geometry `docs/TODO.md` #7): pin `pm4py==2.7.23.1`, re-home repro scripts against the released package. **Blocker #3**: Zenodo DOI — user action (repo URL already wired).
+5. **(optional)** push the geometry `210fa84` commit if the user wants it on the remote.
 
 ## Gotchas / don't-break
 - **HARD RESOURCE RULES (procposets CLAUDE.md):** every local run under `systemd-run --user --scope -q -p MemoryMax=3G -p MemorySwapMax=0 timeout <s> …`; **one heavy process at a time**; **no parallel local compute** (forbids compute-fanning workflows even under ultracode). Background: `cd` explicit, hard timeout, no polling.
