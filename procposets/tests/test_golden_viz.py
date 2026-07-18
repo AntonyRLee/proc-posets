@@ -15,7 +15,6 @@ import pytest
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 SIM = pathlib.Path("/home/arl/Research/-DIAGRAM-String-diagrams-for-process-mining-v2/sim")
-SPME = pathlib.Path("/home/arl/Research/stochastic_process_mining/experiments")
 
 pytestmark = pytest.mark.viz
 
@@ -63,21 +62,32 @@ def test_string_diagram_renders_headless():
     assert isinstance(fig, Figure)
 
 
-def test_spm_viz_extract_generators_matches_spme():
+def test_spm_viz_extract_generators_pinned():
+    # Retired golden seam: this began as a cross-check against SPME's spm.viz /
+    # spm.poset.  Both became pure shims that re-export procposets (spm/viz.py does
+    # `from procposets.viz.spm_viz import *`; spm/__init__ aliases
+    # sys.modules["spm.poset"] = procposets.poset), so the old
+    # `== oviz.extract_generators(model(opos))` side re-entered the SAME procposets
+    # function object on an equal input -- a tautology that could no longer catch a
+    # regression, hung off a hardcoded external path.  It survives as a
+    # self-contained regression on the pinned generator-cospan signature (value
+    # computed from procposets.viz.spm_viz.extract_generators).
     pytest.importorskip("matplotlib")
     import procposets.viz.spm_viz as nviz
     import procposets as pp
-    if not (SPME / "spm").is_dir():
-        pytest.skip("SPME not checked out")
-    if str(SPME) not in sys.path:
-        sys.path.insert(0, str(SPME))
-    oviz = importlib.import_module("spm.viz")
-    opos = importlib.import_module("spm.poset")
 
     def model(mp):
         return [(mp.then(mp.leaf("a"), mp.par(mp.leaf("b"), mp.leaf("c")), mp.leaf("d")), 1.0)]
 
-    assert nviz.extract_generators(model(pp)) == oviz.extract_generators(model(opos))
+    # a -> (b || c) -> d: each activity's (label, in-ports, out-ports); a source legs
+    # in from gamma_1, a sink legs out to gamma_2 (the SPME spm.viz cross-check agreed
+    # on this signature).
+    assert nviz.extract_generators(model(pp)) == [
+        ("a", (("g1", "a"),), (("a", "b"), ("a", "c"))),
+        ("b", (("a", "b"),), (("b", "d"),)),
+        ("c", (("a", "c"),), (("c", "d"),)),
+        ("d", (("b", "d"), ("c", "d")), (("d", "g2"),)),
+    ]
 
 
 def test_dag_render_dot_matches_cpm():
