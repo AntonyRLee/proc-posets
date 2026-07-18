@@ -170,31 +170,26 @@ def test_occn_to_signature_imports():
 
 
 # ---------------------------------------------------------------------------
-# B2 [pm4py] outbound adapter  ==  SPME pm_adapters
+# B2 [pm4py] outbound adapter -- pinned stochastic language
 # ---------------------------------------------------------------------------
+# Retired golden seam: this began as a cross-check against SPME's
+# demo/09_pm4py_baselines/pm_adapters.py.  That original was itself turned into
+# a shim over procposets.adapters.outbound (SPME 2f21eb8) and then purged
+# (SPME a58bfaf) -- the seam is closed, the consumer now trusts procposets.
+# The check survives as a self-contained value regression on the pinned law
+# (computed from procposets.traces.trace_distribution), which is what the
+# original comparison agreed on.
 
 @pytest.mark.pm4py
-def test_outbound_to_process_tree_matches_spme():
+def test_outbound_to_language_pinned():
     pytest.importorskip("pm4py")
     import procposets.adapters.outbound as nout
     import procposets as pp
-    SPME = pathlib.Path("/home/arl/Research/stochastic_process_mining/experiments")
-    if not (SPME / "spm").is_dir():
-        pytest.skip("SPME not checked out")
-    if str(SPME) not in sys.path:
-        sys.path.insert(0, str(SPME))
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "orig_pm_adapters", SPME / "demo" / "09_pm4py_baselines" / "pm_adapters.py")
-    oout = importlib.util.module_from_spec(spec)
-    sys.modules["orig_pm_adapters"] = oout
-    spec.loader.exec_module(oout)
-    import spm.poset as opos
 
     def model(mp):
         return [(mp.then(mp.leaf("a"), mp.par(mp.leaf("b"), mp.leaf("c")), mp.leaf("d")), 1.0)]
 
-    # stochastic language is the cleanest value comparison (tree object identity differs)
-    lang_new = nout.to_language(model(pp))
-    lang_old = oout.to_language(model(opos))
-    assert lang_new == pytest.approx(lang_old)
+    # a -> (b || c) -> d, weight 1.0: the two interleavings of the parallel block,
+    # each 1/2 of the mass (the SPME pm_adapters cross-check agreed on this law).
+    lang = nout.to_language(model(pp))
+    assert lang == pytest.approx({("a", "b", "c", "d"): 0.5, ("a", "c", "b", "d"): 0.5})
