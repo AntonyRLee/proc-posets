@@ -41,19 +41,30 @@ def _bc(row1: dict[str, float], row2: dict[str, float], states: list[str]) -> fl
     return sum(math.sqrt(row1.get(s, 0.0) * row2.get(s, 0.0)) for s in states)
 
 
-def smd_rows(built1, built2, mode=None, normalize=False) -> tuple[float, dict[str, float]]:
-    """SMD between two already-BUILT (matrix, states) pairs, on their union state space --
-    for reusing builds, or for comparing against a hand-built chain that no finite variant
-    set produces (e.g. the cyclic loop limit of `spm.loops.loop_limit`).
+def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[float, dict[str, float]]:
+    """SMD between two already-BUILT (matrix, states) pairs -- for reusing builds, or for
+    comparing against a hand-built chain that no finite variant set produces (e.g. the cyclic
+    loop limit of `spm.loops.loop_limit`).
 
-    `normalize` divides by sqrt(|states|) -- the distance paper's Result-4 factor (Eq. D4):
+    `normalize` divides by sqrt(|X|) -- the distance paper's Result-4 factor (Eq. D4):
     d/sqrt(|X|) is the ROOT-MEAN-SQUARE Bhattacharyya angle over the rows, bounded in [0, pi]
     and comparable across DIFFERENT state-space sizes (the raw SMD is extensive: it grows with
     the number of differing rows). Use this whenever the two objects may have different |X|
-    -- e.g. fleet sites with different block counts, or an empirical object as N grows."""
+    -- e.g. fleet sites with different block counts, or an empirical object as N grows.
+
+    `states` fixes the space X the distance is evaluated on. Pass the FLEET-WIDE union (states
+    over ALL models under comparison, e.g. what `smd_pairwise` builds) so that with `normalize`
+    the 1/sqrt(|X|) factor is one global constant and the distance is a genuine metric. This is
+    LOCKED: |X| is fleet-wide, NOT per-pair -- a per-pair |X| gives each pair its own denominator
+    and breaks the triangle inequality (see the geometry paper §VI.A). `states` must be a
+    superset of both builds' own states; widening beyond a pair's own union leaves the RAW
+    distance unchanged (the extra states route to the sink on both models -> angle 0) and only
+    rescales the normalised one. Defaults to the pair's own union -- correct for a lone pair,
+    where the fleet IS the pair, so plain `smd(..., normalize=True)` is already metric-correct."""
     m1, s1 = built1
     m2, s2 = built2
-    states = sorted(set(s1) | set(s2))
+    if states is None:
+        states = sorted(set(s1) | set(s2))
     a1, a2 = _augment(m1, states, mode), _augment(m2, states, mode)
     total = 0.0
     per_block: dict[str, float] = {}
@@ -73,14 +84,17 @@ def smd(model1: Model, model2: Model, mode=None, context_depth: int = 1,
     ("sink" default, or "selfloop"); see NORMALISATION above. `context_depth` is the VLMC dial
     passed to `build` (1 = memoryless blocks; higher = sharper, less row-sharing). `normalize`
     applies the Result-4 sqrt(|X|) factor for cross-state-space-size comparability (see
-    `smd_rows`)."""
+    `smd_rows`); for a lone pair the pair IS the fleet, so this is metric-correct, but to
+    normalise ACROSS a fleet use `smd_pairwise(models, normalize=True)` (one fleet-wide |X|)."""
     return smd_rows(build(model1, context_depth), build(model2, context_depth), mode, normalize)
 
 
-def _pairwise_rows(rowmaps, states) -> list[list[float]]:
-    """Pairwise matrix-angle distances over pre-augmented row maps on a common state space."""
+def _pairwise_rows(rowmaps, states, normalize=False) -> list[list[float]]:
+    """Pairwise matrix-angle distances over pre-augmented row maps on a common state space.
+    `normalize` applies the single fleet-wide 1/sqrt(|states|) scale to every entry."""
     n = len(rowmaps)
     D = [[0.0] * n for _ in range(n)]
+    scale = 1.0 / math.sqrt(len(states)) if normalize and states else 1.0
     for i in range(n):
         for j in range(i + 1, n):
             total = 0.0
@@ -93,20 +107,30 @@ def _pairwise_rows(rowmaps, states) -> list[list[float]]:
                 bc = min(1.0, max(0.0, sum(math.sqrt(v * r2.get(t, 0.0)) for t, v in r1.items())))
                 ang = math.acos(bc)
                 total += ang * ang
-            D[i][j] = D[j][i] = 2.0 * math.sqrt(total)
+            D[i][j] = D[j][i] = 2.0 * math.sqrt(total) * scale
     return D
 
 
-def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1) -> list[list[float]]:
+def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1,
+                 normalize=False) -> list[list[float]]:
     """Pairwise SMD over a fleet of models, building each block matrix ONCE on the fleet-wide
-    common state space. Agrees with smd() on every pair: a state unused by both models of a pair
-    augments to identical rows (angle 0) in either normalisation, and extra target states carry
-    zero Bhattacharyya mass, so widening the common state space beyond the pair's own union
-    changes nothing -- it only saves the n-1 rebuilds per model."""
+    common state space X (the union over ALL models).
+
+    Raw (normalize=False) agrees with smd() on every pair: a state unused by both models of a
+    pair augments to identical rows (angle 0), and extra target states carry zero Bhattacharyya
+    mass, so widening the common space beyond the pair's own union changes nothing -- it only
+    saves the n-1 rebuilds per model.
+
+    normalize=True divides EVERY entry by sqrt(|X|) on that one fleet-wide space, so the
+    1/sqrt(|X|) factor is a single global constant and the result is a genuine metric (LOCKED:
+    fleet-wide constant |X|, per the geometry paper §VI.A). This is the correct normalised fleet
+    distance -- do NOT normalise pair-by-pair via `smd(a, b, normalize=True)` across a fleet with
+    differing state-space sizes: that gives each pair its own denominator and breaks the triangle
+    inequality."""
     built = [build(m, context_depth) for m in models]
     states = sorted(set().union(*(s for _, s in built)))
     aug = [_augment(m, states, mode) for m, _ in built]
-    return _pairwise_rows(aug, states)
+    return _pairwise_rows(aug, states, normalize)
 
 
 def bhattacharyya_angle(model1: Model, model2: Model) -> float:
