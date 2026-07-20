@@ -15,3 +15,10 @@ The pm4py model adapters live in ``procposets.adapters``; ``procposets.occn``
 is the object-centric causal-net miner; ``procposets.equivalence`` is the
 [graph] structural-equivalence surface.
 """
+
+# The output-sensitive extractor is a light B0-only convenience surfaced at the
+# package root (the exact CanonKey twin of engine.extract_signature for wide
+# object-centric nets); everything else is imported by full module path.
+from .engine_fast import extract_signature_fast  # noqa: E402,F401
+
+__all__ = ["extract_signature_fast"]

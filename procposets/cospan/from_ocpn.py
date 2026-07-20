@@ -14,11 +14,39 @@ is the algebraic presentation of the OCPN as discovered, not of a re-derivation.
 """
 from __future__ import annotations
 
+from .engine import extract_signature
+from .engine_fast import extract_signature_fast
 from .from_petri import lmgraph_from_petri_nets
 from .lmgraph import LMGraph
+from .signature import Signature
 
 
 def lmgraph_from_ocpn(ocpn: dict) -> LMGraph:
     """Build a typed LM-graph from a ``discover_oc_petri_net`` result."""
     nets = {otype: triple[0] for otype, triple in ocpn["petri_nets"].items()}
     return lmgraph_from_petri_nets(nets)
+
+
+def signature_from_ocpn(ocpn: dict, *, canonical: bool = False,
+                        surface_termini: bool = False,
+                        remove_silent: bool = True) -> Signature:
+    """OCPN dict -> generator signature ``Sigma`` (the ``lmgraph_from_ocpn`` +
+    extractor pipeline in one call).
+
+    ``canonical=False`` (default) runs :func:`engine.extract_signature` -- the full
+    per-context signature carrying every firing context, needed for the
+    splice/behavioural semantics.  ``canonical=True`` runs the output-sensitive
+    :func:`engine_fast.extract_signature_fast`: one representative generator per
+    CanonKey, which stays tractable on *wide* object-centric nets where the full
+    extractor's cross-type ``|B|x|F|`` product blows up (a hub shared across many
+    object types is exponential).  The two agree exactly on the CanonKey set (the
+    type-level / :func:`signature_compare.compare` view) -- so pass
+    ``canonical=True`` when you only need that view (comparison, inventory), and
+    keep the default for splice.
+
+    OCPN callers typically want ``surface_termini=True`` (keep an object that
+    terminates at a bare sink place as a ``gamma2`` right leg -- the object-centric
+    final marking); it defaults ``False`` here to match :func:`extract_signature`."""
+    g = lmgraph_from_ocpn(ocpn)
+    extract = extract_signature_fast if canonical else extract_signature
+    return extract(g, surface_termini=surface_termini, remove_silent=remove_silent)
