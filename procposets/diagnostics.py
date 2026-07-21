@@ -28,7 +28,12 @@ from .npmle import FitResult, trivial_chain_loglik
 from .rel import Rel, SPTree, tree_relations
 
 
-def report_vs_trivial(log: GroupedLog, fit: FitResult, eps: float) -> str:
+def trivial_report(log: GroupedLog, fit: FitResult, eps: float) -> str:
+    """Trivial-mixture falsification report (was ``report_vs_trivial``).
+
+    Compares the NPMLE fit against the degenerate chain mixture in the same grouped
+    likelihood -- "did we beat the trivial solution, and by how much per group".
+    """
     triv = trivial_chain_loglik(log, eps=max(eps, 1e-3))
     diff = fit.loglik - triv
     verdict = (
@@ -41,6 +46,11 @@ def report_vs_trivial(log: GroupedLog, fit: FitResult, eps: float) -> str:
         f"loglik(NPMLE) = {fit.loglik:.2f}   loglik(trivial chains) = {triv:.2f}   "
         f"delta = {diff:+.2f}  ({diff / log.G:+.3f} per group)\n  -> {verdict}"
     )
+
+
+# back-compat alias (removed at each consumer's cut-over); the historical name is
+# imported by the PMN demos via poset_mixture.diagnostics == procposets.diagnostics.
+report_vs_trivial = trivial_report
 
 
 def recovery_report(fit: FitResult, true_trees: Sequence[SPTree],

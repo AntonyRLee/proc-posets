@@ -47,6 +47,7 @@ from .rel import (
     rel_from_trace,
     respects,
     sample_extension,
+    sample_extension_tree,
     sample_linear_extension,
     series,
     transitive_reduction,
@@ -114,7 +115,8 @@ _LAZY = {  # top-level name -> (submodule, attribute)
        ("moment_seed", "poset_moment", "margin_equivalent",
         "find_margin_equivalences")},
     **{n: ("diagnostics", n) for n in
-       ("recovery_report", "identifiability_report", "bootstrap_weights")},
+       ("trivial_report", "recovery_report", "identifiability_report",
+        "bootstrap_weights")},
 }
 
 
@@ -138,7 +140,8 @@ __all__ = [
     "enumerate_posets", "meet_closure", "describe", "get_poset_class",
     "GENERAL", "SP",
     # SP-tree view
-    "SPTree", "decompose", "is_sp", "extension_count", "sample_extension",
+    "SPTree", "decompose", "is_sp", "extension_count",
+    "sample_extension", "sample_extension_tree",
     "tree_relations", "series", "parallel", "enumerate_sp",
     # canonical Poset
     "Poset", "leaf", "then", "par", "n_poset", "from_dag", "from_edges",
@@ -159,7 +162,7 @@ __all__ = [
     "find_margin_equivalences",
     "TrueMixture", "sample_grouped_log", "sample_keyed_log",
     "sample_timed_grouped_log",
-    "recovery_report", "identifiability_report", "bootstrap_weights",
+    "trivial_report", "recovery_report", "identifiability_report", "bootstrap_weights",
     # A1 stochastic distance + known-law estimators (stdlib)
     "smd", "smd_rows", "smd_pairwise", "bhattacharyya_angle",
     "build_block_matrix", "normal_form_distribution",
