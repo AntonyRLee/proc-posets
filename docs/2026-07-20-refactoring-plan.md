@@ -464,7 +464,19 @@ before/after `repr()` capture **byte-identical** + full suite green.
   enumeration → one private `_enumerate` generator; unified the `FeasibilityTooLarge`
   message (untested text). `test_cpm_feasibility` 6/6.
 
+- **rel canonical key + `_ideals`/`_filters` merge** (`5733672`) — inline
+  `(len(r), sorted(r))` ×3 → `_canonical_key`; `_ideals`/`_filters` → one
+  `_closed_sets(elements, rel, *, down)`. Capture: enumerate_posets/enumerate_sp/
+  meet_closure/_ideals/_filters byte-identical (15 lines).
+- **likelihood preds** (`85a6b74`) — `_k_vectors` → `_extensions.preds` (3rd/last
+  core preds site).
+- **UnionFind primitive** (`bceb94c`) — `moddecomp._components` +
+  `engine_fast._components` → shared `procposets/_unionfind.py`, grouping order
+  preserved exactly. Capture: moddecomp `tiling()`/`decompose()` over 8 posets
+  byte-identical. **Renderers stay separate — only the primitive is shared.**
+
 **Phase 2 deferred (need consumer-repo gating or bigger surface):** OCCN `_lift.py`
-helpers; `cospan/_boundary.py` constants; union-find primitive; adapter
-build/validate wrappers; rel canonical-key + `_ideals`/`_filters` merge; tree-block
-flatten skeleton.
+helpers and adapter build/validate wrappers ([pm4py]/[graph] — skip standalone);
+`cospan/_boundary.py` constants single-source; tree-block flatten skeleton
+(`matrix._block_sequence`/`discrete._block_items` — windowing part is
+`changes-values`).
