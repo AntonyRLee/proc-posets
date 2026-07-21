@@ -44,6 +44,7 @@ atom on all groups is one small matrix product.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from math import exp, factorial, log as _ln
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -84,14 +85,25 @@ class Atom:
     e: int          # extension count e(P)
     eps: float
     eta: float
-    noise: str = "uniform"
+    noise_kernel: str = "uniform"
     desc: str = ""  # human-readable form of rel (SP tree string or Hasse covers)
     lam: float = 1.0  # completion rate for timed traces (ignored on untimed logs)
 
     def describe(self) -> str:
-        tag = "" if self.noise == "uniform" else f", noise={self.noise}"
+        # the printed token stays ``noise=`` (byte-pinned in the consumer demo golden);
+        # only the attribute it reads was renamed noise -> noise_kernel.
+        tag = "" if self.noise_kernel == "uniform" else f", noise={self.noise_kernel}"
         tag += "" if self.lam == 1.0 else f", lam={self.lam:g}"
         return f"{self.desc}  [e={self.e}, eps={self.eps:g}, eta={self.eta:g}{tag}]"
+
+    @property
+    def noise(self) -> str:
+        """Deprecated alias for :attr:`noise_kernel` (removed at consumer cut-over)."""
+        warnings.warn(
+            "Atom.noise is deprecated; use Atom.noise_kernel",
+            DeprecationWarning, stacklevel=2,
+        )
+        return self.noise_kernel
 
 
 class GroupedLog:
@@ -186,14 +198,14 @@ class GroupedLog:
         if atom.eps == 0.0:
             contamination = 0.0  # kernel is density-neutral at eps = 0:
             #                      skip it (avoids the N1 enumeration)
-        elif atom.noise == "swap":
+        elif atom.noise_kernel == "swap":
             n1_ind, n1_size = self.swap_kernel(atom.rel)
             contamination = n1_ind / n1_size
-        elif atom.noise == "uniform":
+        elif atom.noise_kernel == "uniform":
             contamination = 1.0 / self.m_fact
         else:
             raise ValueError(
-                f"unknown noise kernel {atom.noise!r}: the declared kernels "
+                f"unknown noise kernel {atom.noise_kernel!r}: the declared kernels "
                 f"are 'uniform' and 'swap'"
             )
         clean = (1.0 - atom.eps) * in_L / atom.e + atom.eps * contamination
@@ -218,15 +230,31 @@ def make_atom(
     rel: Rel,
     eps: float,
     eta: float,
-    noise: str = "uniform",
+    noise_kernel: str = "uniform",
     poset_class=GENERAL,
     lam: float = 1.0,
+    *,
+    noise: str | None = None,
 ) -> Optional[Atom]:
     """Build an atom from a relation set.
 
     Returns None if the declared hypothesis class does not contain the order
     (only possible for the SP class; the general class contains everything).
+
+    ``noise`` is the deprecated spelling of ``noise_kernel`` (kept one release for
+    back-compat; removed at consumer cut-over).
     """
+    if noise is not None:
+        if noise_kernel != "uniform":
+            raise TypeError(
+                "make_atom(): pass noise_kernel, not both noise_kernel and the "
+                "deprecated noise"
+            )
+        warnings.warn(
+            "make_atom(noise=...) is deprecated; use noise_kernel=...",
+            DeprecationWarning, stacklevel=2,
+        )
+        noise_kernel = noise
     cls = get_poset_class(poset_class)
     assert is_partial_order(elements, rel), (
         f"relation set is not a transitively closed partial order on "
@@ -239,7 +267,7 @@ def make_atom(
         e=cls.extension_count(elements, rel),
         eps=eps,
         eta=eta,
-        noise=noise,
+        noise_kernel=noise_kernel,
         desc=describe(elements, rel),
         lam=lam,
     )
@@ -324,7 +352,7 @@ class TimedGroupedLog(GroupedLog):
         # (lam**m, exp(-lam <k, gaps>)) overflowed for large m log(lam) and
         # underflowed to an exact 0.0 -- hence a spurious -inf group density
         # -- for lam <k, gaps> beyond ~745 (DESIGN_REVIEW W6).
-        if atom.noise == "swap":
+        if atom.noise_kernel == "swap":
             raise ValueError("timed traces support only the uniform eps kernel")
         if in_L is None:
             in_L = self.in_L(atom.rel)

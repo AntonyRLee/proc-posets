@@ -474,7 +474,7 @@ def test_unknown_noise_kernel_rejected():
     with pytest.raises(ValueError, match="noise kernel"):
         fit(log, noise_kernel="Swap")
     # trace_p's dispatch is exhaustive (eps > 0 so the kernel is consulted)
-    a = make_atom(frozenset("abcd"), frozenset(), 0.1, 0.0, noise="bogus")
+    a = make_atom(frozenset("abcd"), frozenset(), 0.1, 0.0, noise_kernel="bogus")
     with pytest.raises(ValueError, match="noise kernel"):
         log.trace_p(a)
 
@@ -484,7 +484,7 @@ def test_declared_kernel_travels_on_eps0_atoms(swap_noisy_fit):
     # neutral at eps = 0), so a later eps line search -- polish_nuisances --
     # prices under the declared kernel instead of a stale "uniform" tag.
     _, res = swap_noisy_fit
-    assert all(a.noise == "swap" for a in res.atoms)
+    assert all(a.noise_kernel == "swap" for a in res.atoms)
 
 
 def test_timed_swap_rejected_at_oracle_boundary():

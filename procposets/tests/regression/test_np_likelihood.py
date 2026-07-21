@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import warnings
 from collections import Counter
 
 import numpy as np
@@ -137,7 +138,7 @@ def test_trace_p_normalises_uniform_kernel(rel, eps, eta):
 def test_trace_p_normalises_swap_kernel(rel, eps, eta):
     # swap kernel: eps mass sits on N1(rel), which is non-empty for these rels
     log = full_perm_log("abcd")
-    atom = make_atom(ABCD, rel, eps, eta, noise="swap")
+    atom = make_atom(ABCD, rel, eps, eta, noise_kernel="swap")
     assert len(brute_n1("abcd", rel)) > 0  # precondition for exact normalisation
     s = log.trace_p(atom).sum()
     assert abs(s - 1.0) < 1e-12
@@ -259,7 +260,7 @@ def test_group_logf_matches_naive_per_group(noise):
     bac, cab = ("b", "a", "c"), ("c", "a", "b")
     groups = [[abc, abc, acb], [acb, bac], [cab]]
     log = GroupedLog(groups)
-    atom = make_atom(ABC, AB, 0.2, 0.3, noise=noise)
+    atom = make_atom(ABC, AB, 0.2, 0.3, noise_kernel=noise)
     p = log.trace_p(atom)
     assert np.all(p[np.array([log.tidx[t] for g in groups for t in g])] > 0)
     naive = np.array([sum(math.log(p[log.tidx[t]]) for t in g) for g in groups])
@@ -276,7 +277,7 @@ def test_make_atom_general_class_non_sp_rel():
     assert atom is not None and isinstance(atom, Atom)
     assert atom.e == len(brute_extensions("abcd", N_REL)) == 5
     assert atom.eps == 0.05 and atom.eta == 0.1
-    assert atom.noise == "uniform" and atom.lam == 1.0
+    assert atom.noise_kernel == "uniform" and atom.lam == 1.0
     assert atom.desc != ""  # Hasse form for a non-SP order
     assert "<" in atom.desc
 
@@ -384,7 +385,7 @@ def test_timed_k_vectors_match_brute_and_marginal_normalises():
 
 def test_timed_swap_kernel_rejected():
     tl = _tiny_timed_log()
-    atom = make_atom(frozenset("ab"), frozenset(), 0.1, 0.0, noise="swap")
+    atom = make_atom(frozenset("ab"), frozenset(), 0.1, 0.0, noise_kernel="swap")
     with pytest.raises(ValueError):
         tl.group_logf(atom)
 
@@ -462,3 +463,26 @@ def test_make_atom_asserts_partial_order():
     broken = frozenset({("a", "b"), ("b", "c")})  # missing (a, c)
     with pytest.raises(AssertionError, match="transitively closed"):
         make_atom(frozenset("abc"), broken, 0.0, 0.0)
+
+
+def test_noise_kernel_deprecation_shim():
+    # Phase-4 item 4: noise -> noise_kernel behind deprecation shims.
+    ab = frozenset("ab")
+    # canonical spelling: no warning
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        a = make_atom(ab, frozenset(), 0.1, 0.0, noise_kernel="swap")
+    assert a.noise_kernel == "swap"
+
+    # deprecated make_atom(noise=) still works, but warns
+    with pytest.warns(DeprecationWarning, match="noise_kernel"):
+        b = make_atom(ab, frozenset(), 0.1, 0.0, noise="swap")
+    assert b.noise_kernel == "swap"
+
+    # deprecated .noise read returns noise_kernel, but warns
+    with pytest.warns(DeprecationWarning, match="noise_kernel"):
+        assert b.noise == "swap"
+
+    # passing both (non-default) is a TypeError
+    with pytest.raises(TypeError, match="not both"):
+        make_atom(ab, frozenset(), 0.1, 0.0, noise_kernel="swap", noise="uniform")

@@ -189,7 +189,7 @@ class Oracle:
                         # a stale "uniform" tag
                         self.atoms.append(
                             Atom(rel=rel, e=a0.e, eps=eps, eta=eta,
-                                 noise=self.noise_kernel,
+                                 noise_kernel=self.noise_kernel,
                                  desc=a0.desc, lam=lam)
                         )
         if self.budget_skipped and self.kind == "meet-closure":
