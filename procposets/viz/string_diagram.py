@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from math import comb
+from typing import Callable
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -80,6 +81,69 @@ TYPE_LANES: dict[str | None, float] | None = None  # object type -> fixed
 # and boxes centre over their ports, so all wires run straight and
 # horizontal. Sound only while no generator carries two same-typed ports on
 # one edge (duplicates are nudged apart by _PS as a fallback).
+
+
+# --- style config dataclasses ----------------------------------------------
+# The 14 knobs above, grouped into two frozen dataclasses split along the exact
+# layout/draw fault line (so a future viz/_layout.py stays matplotlib-free): the
+# LAYOUT knobs are read only by the geometry functions, the DRAW knobs only by the
+# matplotlib backend. render(style=None) BUILDS a style from the module globals
+# above (the bridge), so the legacy "sd.STRAIGHT_SPINE = True; render(...)" override
+# path stays byte-identical; pass style=StringDiagramStyle(...) for the clean API.
+@dataclass(frozen=True)
+class LayoutStyle:
+    straight_spine: bool = False
+    port_order_key: Callable[[Port], object] | None = None
+    align_boundary_stubs: bool = False
+    type_lanes: dict[str | None, float] | None = None
+
+
+@dataclass(frozen=True)
+class DrawStyle:
+    boundary_linestyle: str = "--"
+    internal_wire_linestyle: str = "-"
+    open_end_markers: bool = True
+    box_facecolor: str = "white"
+    box_face_overrides: dict[str, str] = field(default_factory=dict)
+    box_label_map: dict[str, str] = field(default_factory=dict)
+    box_label_fontsize: float = 9
+    svg_gids: bool = False
+    gid_roles: dict[str, str] = field(default_factory=dict)
+    gid_round_offset: int = 0
+
+
+@dataclass(frozen=True)
+class StringDiagramStyle:
+    layout: LayoutStyle = LayoutStyle()
+    draw: DrawStyle = DrawStyle()
+
+
+DEFAULT_STYLE = StringDiagramStyle()
+
+
+def _style_from_globals() -> StringDiagramStyle:
+    """Build a style from the legacy module-level knobs (the render(style=None) bridge)."""
+    return StringDiagramStyle(
+        layout=LayoutStyle(
+            straight_spine=STRAIGHT_SPINE,
+            port_order_key=PORT_ORDER_KEY,
+            align_boundary_stubs=ALIGN_BOUNDARY_STUBS,
+            type_lanes=TYPE_LANES,
+        ),
+        draw=DrawStyle(
+            boundary_linestyle=BOUNDARY_LINESTYLE,
+            internal_wire_linestyle=INTERNAL_WIRE_LINESTYLE,
+            open_end_markers=OPEN_END_MARKERS,
+            box_facecolor=BOX_FACECOLOR,
+            box_face_overrides=BOX_FACE_OVERRIDES,
+            box_label_map=BOX_LABEL_MAP,
+            box_label_fontsize=BOX_LABEL_FONTSIZE,
+            svg_gids=SVG_GIDS,
+            gid_roles=GID_ROLES,
+            gid_round_offset=GID_ROUND_OFFSET,
+        ),
+    )
+
 
 # --- geometry constants -----------------------------------------------------
 _BW = 1.4  # box width
@@ -216,25 +280,25 @@ def _ports(item: "Generator | LoopBox") -> tuple[frozenset, frozenset]:
     return item.left, item.right
 
 
-def _box_sub(g: Generator) -> _Sub:
+def _box_sub(g: Generator, style: LayoutStyle) -> _Sub:
     # TODO(generic): this "tap" suffix is a naming-convention hack tied to
     # loop_family's tap ports, not a generic ordering mechanism. A proper fix
     # would let Generator carry explicit port order (e.g. ordered sequences
     # instead of frozensets) so layout doesn't have to guess intent from
     # port-tgt strings.
-    if PORT_ORDER_KEY is not None:
-        ins = sorted(g.left, key=lambda p: (PORT_ORDER_KEY(p), str(p)))
-        outs = sorted(g.right, key=lambda p: (PORT_ORDER_KEY(p), str(p)))
+    if style.port_order_key is not None:
+        ins = sorted(g.left, key=lambda p: (style.port_order_key(p), str(p)))
+        outs = sorted(g.right, key=lambda p: (style.port_order_key(p), str(p)))
     else:
         ins = sorted(g.left)
         outs = sorted(g.right, key=lambda p: (p.tgt == "tap", p))
     created, consumed = _gen_delta(g)
 
-    if TYPE_LANES is not None:
+    if style.type_lanes is not None:
         def lane_col(ports, x):
             out, used = [], {}
-            for p in sorted(ports, key=lambda q: (TYPE_LANES.get(q.typ, 0.0), str(q))):
-                y = TYPE_LANES.get(p.typ, 0.0)
+            for p in sorted(ports, key=lambda q: (style.type_lanes.get(q.typ, 0.0), str(q))):
+                y = style.type_lanes.get(p.typ, 0.0)
                 k = used.get(y, 0)
                 used[y] = k + 1
                 out.append((p, x, y + k * _PS))  # nudge same-lane duplicates
@@ -273,7 +337,7 @@ def _box_sub(g: Generator) -> _Sub:
     )
 
 
-def _seq(a: _Sub, b: _Sub) -> _Sub:
+def _seq(a: _Sub, b: _Sub, style: LayoutStyle) -> _Sub:
     dx = (a.xmax - b.xmin) + _HGAP
     # align b vertically on the bundle of ports it shares with a
     matched = [
@@ -282,7 +346,7 @@ def _seq(a: _Sub, b: _Sub) -> _Sub:
         for (pb, _xb, yb) in b.in_eps
         if pa == pb
     ]
-    if STRAIGHT_SPINE:
+    if style.straight_spine:
         dy = 0.0
     elif matched:
         raw = (sum(m[1] for m in matched) - sum(m[3] for m in matched)) / len(matched)
@@ -321,8 +385,8 @@ def _seq(a: _Sub, b: _Sub) -> _Sub:
     return _Sub(a.boxes + b.boxes, wires, in_eps, out_eps, a.xmin, b.xmax)
 
 
-def _par(a: _Sub, b: _Sub) -> _Sub:
-    if TYPE_LANES is not None:
+def _par(a: _Sub, b: _Sub, style: LayoutStyle) -> _Sub:
+    if style.type_lanes is not None:
         # the type lanes already separate the two blocks vertically; just
         # left-align them without stacking (stacking would pull ports off
         # their lanes and re-introduce wire bends)
@@ -348,7 +412,7 @@ def _par(a: _Sub, b: _Sub) -> _Sub:
         min(a.xmin, b.xmin),
         max(a.xmax, b.xmax),
     )
-    if STRAIGHT_SPINE and out.boxes:
+    if style.straight_spine and out.boxes:
         top = max(bx.y + bx.half_h for bx in out.boxes)
         bot = min(bx.y - bx.half_h for bx in out.boxes)
         out = out.shift(0.0, -(top + bot) / 2)  # centre the stack on the spine
@@ -360,16 +424,16 @@ class Diagram:
     """A ``;``/``⊗`` term over generators.  Compose with ``>>`` and ``@``."""
 
     def __init__(self, build):
-        self._build = build  # () -> _Sub
+        self._build = build  # (LayoutStyle) -> _Sub
 
     def __rshift__(self, other: "Diagram") -> "Diagram":  # self ; other
-        return Diagram(lambda: _seq(self._build(), other._build()))
+        return Diagram(lambda st: _seq(self._build(st), other._build(st), st))
 
     def __matmul__(self, other: "Diagram") -> "Diagram":  # self ⊗ other
-        return Diagram(lambda: _par(self._build(), other._build()))
+        return Diagram(lambda st: _par(self._build(st), other._build(st), st))
 
-    def _sub(self) -> _Sub:
-        return self._build()
+    def _sub(self, style: LayoutStyle) -> _Sub:
+        return self._build(style)
 
 
 def pick(sig: Signature, label: str, i: int | None = None) -> Generator:
@@ -391,7 +455,7 @@ def pick(sig: Signature, label: str, i: int | None = None) -> Generator:
 def D(sig: Signature, label: str, i: int | None = None) -> Diagram:
     """Convenience: a single-box :class:`Diagram` for ``pick(sig, label, i)``."""
     g = pick(sig, label, i)
-    return Diagram(lambda: _box_sub(g))
+    return Diagram(lambda st: _box_sub(g, st))
 
 
 def gens(sig: Signature) -> dict[str, list[Generator]]:
@@ -400,21 +464,21 @@ def gens(sig: Signature) -> dict[str, list[Generator]]:
 
 
 # --- lowering to a Layout ---------------------------------------------------
-def _finish(sub: _Sub) -> Layout:
+def _finish(sub: _Sub, style: LayoutStyle) -> Layout:
     wires = list(sub.wires)
     types = {w.typ for w in wires}
-    # with ALIGN_BOUNDARY_STUBS all open ends on a side share the diagram's
+    # with align_boundary_stubs all open ends on a side share the diagram's
     # outermost x, so every open leg starts/ends flush left/right
     lx = min((x for _, x, _ in sub.in_eps), default=0.0) - _MARGIN
     rx = max((x for _, x, _ in sub.out_eps), default=0.0) + _MARGIN
     for p, x, y in sub.in_eps:  # dangling boundary inputs
-        x0 = lx if ALIGN_BOUNDARY_STUBS else x - _MARGIN
+        x0 = lx if style.align_boundary_stubs else x - _MARGIN
         wires.append(
             Wire(x0, y, x, y, p.typ, p, boundary=True, open_end=(x0, y))
         )
         types.add(p.typ)
     for p, x, y in sub.out_eps:  # dangling boundary outputs
-        x1 = rx if ALIGN_BOUNDARY_STUBS else x + _MARGIN
+        x1 = rx if style.align_boundary_stubs else x + _MARGIN
         wires.append(
             Wire(x, y, x1, y, p.typ, p, boundary=True, open_end=(x1, y))
         )
@@ -642,14 +706,14 @@ def _gid_sanitize(label: str) -> str:
     return _re.sub(r"[^A-Za-z0-9_.:-]+", "_", label).strip("_")
 
 
-def _semantic_gid(b: PlacedBox, layout: Layout) -> tuple[str, str]:
+def _semantic_gid(b: PlacedBox, layout: Layout, style: DrawStyle) -> tuple[str, str]:
     """(element id, label id) for one placed box, per the animation SVG spec."""
-    role = GID_ROLES.get(b.label, "activity")
+    role = style.gid_roles.get(b.label, "activity")
     base = _gid_sanitize(b.label)
     if role == "result":
         cols = sorted({round(x.x, 6) for x in layout.boxes
-                       if GID_ROLES.get(x.label) == "result"})
-        r = cols.index(round(b.x, 6)) + 1 + GID_ROUND_OFFSET
+                       if style.gid_roles.get(x.label) == "result"})
+        r = cols.index(round(b.x, 6)) + 1 + style.gid_round_offset
         return f"node-{base}-r{r}", f"nodelabel-{base}-r{r}"
     if role == "block":
         return f"block-{base}", f"blocklabel-{base}"
@@ -770,7 +834,7 @@ def _point_at(pts: np.ndarray, s: float) -> np.ndarray:
     return pts[k - 1] + frac * (pts[k] - pts[k - 1])
 
 
-def _draw_wires(ax, wires: list["Wire"], cmap: dict) -> None:
+def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
     internal = [w for w in wires if not w.boundary]
     curves = [_curve_for(w) for w in internal]
     lengths = [_arclen(c)[-1] for c in curves]
@@ -788,7 +852,7 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict) -> None:
                     _point_at(curves[under], s_i if under == i else s_j)
                 )
     def _stamp(line, typ):
-        if not SVG_GIDS:
+        if not style.svg_gids:
             return
         cnt = ax.figure.__dict__.setdefault("_wire_gid_counts", {})
         cnt[typ] = cnt.get(typ, 0) + 1
@@ -803,7 +867,7 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict) -> None:
                 lw=2.2,
                 solid_capstyle="butt",
                 zorder=1,
-                ls=INTERNAL_WIRE_LINESTYLE,
+                ls=style.internal_wire_linestyle,
             )
             _stamp(ln, w.typ)
     for w in wires:
@@ -816,7 +880,7 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict) -> None:
             lw=2.2,
             solid_capstyle="butt",
             zorder=1,
-            ls=BOUNDARY_LINESTYLE,
+            ls=style.boundary_linestyle,
         )
         _stamp(ln, w.typ)
 
@@ -833,6 +897,7 @@ def render(
     couplings: list | None = None,
     keys: list | None = None,
     offset: tuple[float, float] | None = None,
+    style: StringDiagramStyle | None = None,
 ):
     """Render a :class:`Diagram` or :class:`CompositeDiagram` to a matplotlib
     figure.  ``signature`` (optional) seeds the legend with all its object types
@@ -843,12 +908,17 @@ def render(
     custom text instead of its triple -- for a symbolic multiplicity (e.g.
     ``"2u"``) a single representative port stands in for an unbounded number
     of same-typed wires that can't literally be drawn.  Returns the
-    :class:`~matplotlib.figure.Figure`."""
+    ``style`` overrides the layout/draw knobs; ``None`` (default) builds one from the
+    module-level globals so the legacy ``sd.STRAIGHT_SPINE = True; render(...)`` path
+    stays byte-identical.  Returns the :class:`~matplotlib.figure.Figure`."""
+    if style is None:
+        style = _style_from_globals()
+    lay, ds = style.layout, style.draw
     if isinstance(obj, Diagram):
-        sub = obj._sub()
+        sub = obj._sub(lay)
         if offset is not None:
             sub = sub.shift(*offset)
-        layout = _finish(sub)
+        layout = _finish(sub, lay)
     elif isinstance(obj, CompositeDiagram):
         layout = _layout_composite(obj)
     else:
@@ -866,12 +936,12 @@ def render(
         fig = ax.figure
         owns_fig = False
 
-    _draw_wires(ax, layout.wires, cmap)
+    _draw_wires(ax, layout.wires, cmap, ds)
     for w in layout.wires:
         if not w.boundary:
             continue
         ex, ey = w.open_end if w.open_end is not None else (w.x1, w.y1)
-        if OPEN_END_MARKERS:
+        if ds.open_end_markers:
             ax.plot([ex], [ey], marker="o", ms=4, color=cmap[w.typ], zorder=5)
         # open end at x1 -> box sits to the right -> label extends further
         # left (away from the box); open end at x2 -> the mirror case.
@@ -907,14 +977,14 @@ def render(
             edgecolor="#d62728" if offending else "black",
             facecolor="#ffecec"
             if offending
-            else BOX_FACE_OVERRIDES.get(b.label, BOX_FACECOLOR),
+            else ds.box_face_overrides.get(b.label, ds.box_facecolor),
             zorder=3,
         )
         ax.add_patch(rect)
-        txt = ax.text(b.x, b.y, BOX_LABEL_MAP.get(b.label, b.label),
-                      ha="center", va="center", fontsize=BOX_LABEL_FONTSIZE, zorder=4)
-        if SVG_GIDS:
-            gid, lgid = _semantic_gid(b, layout)
+        txt = ax.text(b.x, b.y, ds.box_label_map.get(b.label, b.label),
+                      ha="center", va="center", fontsize=ds.box_label_fontsize, zorder=4)
+        if ds.svg_gids:
+            gid, lgid = _semantic_gid(b, layout, ds)
             rect.set_gid(gid)
             txt.set_gid(lgid)
 
@@ -1050,6 +1120,7 @@ def catalogue(
     cols: int = 4,
     title: str | None = None,
     labels: bool = True,
+    style: StringDiagramStyle | None = None,
 ):
     """Render a signature's generator cospans as a grid of string-diagram panels.
 
@@ -1111,7 +1182,7 @@ def catalogue(
             for p, cstr in card_by_port.items():
                 panel_labels[p] = f"{wire_labels.get(p, '')} {cstr}".strip()
         couplings, key_splits = _binding_graphics(g)
-        render(d, sig, ax=ax, wire_labels=panel_labels, couplings=couplings, keys=key_splits)
+        render(d, sig, ax=ax, wire_labels=panel_labels, couplings=couplings, keys=key_splits, style=style)
         prof = binding_profile(g)
         # relations (conservation/key) are now drawn graphically on the panel; the title
         # stays a compact label (the long `bind:` text overflowed/overlapped neighbours).
