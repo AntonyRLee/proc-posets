@@ -470,7 +470,7 @@ def describe(elements: FrozenSet[str], rel: Rel) -> str:
 # ---------------------------------------------------------------------------
 
 class PosetClass:
-    """Protocol for a hypothesis class of partial orders (README choice C).
+    """Abstract base class for a hypothesis class of partial orders (README choice C).
 
     A class declares two capability flags the oracle dispatches on -- these
     document exactly what the meet-closure reduction theorem needs, instead

@@ -2,12 +2,12 @@
 as **N-linear-parameterised generator cospans** -- the object the user reads off
 ``model.svg`` ("a finite small collection of N-linear parameterised generators").
 
-Where :mod:`cpm.cospan.signature_diff` compares *behavioural label-skeletons*
+Where :mod:`procposets.cospan.signature_diff` compares *behavioural label-skeletons*
 (deliberately dropping ports, types and multiplicity -- "same activity language"),
 this keeps the **generator inventory with its §32 leg-multiplicity parameters
 intact** and asks "did discovery rederive the master's parameterised generators".
 
-The obstacle is that :class:`~cpm.cospan.signature.Port` ``src``/``tgt`` naming is
+The obstacle is that :class:`~procposets.cospan.signature.Port` ``src``/``tgt`` naming is
 notation-specific -- the master's hand-authored ``gamma1``/``outcome`` vs the OCCN
 miner's ``START_<ot>`` -- so a raw ``Port`` comparison aligns nothing. What *is*
 shared (both adapters read it off the same OCEL) is the activity **label** and the
@@ -135,7 +135,7 @@ def binding_profile(g: Generator) -> BindingProfile:
     """Extract :class:`BindingProfile` from one generator's §32 constraints.
 
     Single-leg unit-coefficient constraints are folded per leg into a ``(lo, hi)``
-    interval (mirroring :func:`cpm.vis._leg_card_by_port`): ``>=``/``==`` raise ``lo``,
+    interval (mirroring the consumer viz's ``_leg_card_by_port``): ``>=``/``==`` raise ``lo``,
     ``<=``/``==`` lower ``hi``; a leg with none defaults to 1:1 and is dropped.
     Multi-leg constraints become :attr:`BindingProfile.relations`."""
     by_port: dict = {}  # Port -> [lo, hi]

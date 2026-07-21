@@ -1,7 +1,7 @@
 """OCCN -> cospan generator Signature (the deferred D1 adapter).
 
 Maps a mined :class:`markers.OCCN` into the repo's
-``cpm.cospan.signature.Signature`` (the same datatype the PN/PT/BPMN/CN
+``procposets.cospan.signature.Signature`` (the same datatype the PN/PT/BPMN/CN
 pipeline produces), so OCCN joins the cross-notation comparison.
 
 Construction (matches the paper's §4 OCCN -> cospan and ``RUNNING_EXAMPLE.md``):
@@ -100,7 +100,7 @@ def _leg_constraints(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
     parameterised by its own legs (the "blueprint"): the input interval and the
     mirror output interval describe *different* per-firing quantities and live on
     *different* generators. They are only reconciled when the cospans are composed --
-    :func:`cpm.cospan.constraints.union` intersects the shared ``Port`` identity,
+    :func:`procposets.cospan.constraints.union` intersects the shared ``Port`` identity,
     which **is** the pushout. A convergent wire whose producer per-firing fan-out and
     consumer per-firing intake disagree is therefore pruned (or grows node
     multiplicity, §36) *at composition/grounding*, not pre-resolved here. Earlier this
@@ -140,7 +140,7 @@ def occn_to_signature(occn: OCCN, *, bindings: bool = True) -> Signature:
     interval, each shared-key distribution as a partition equality. Pass
     ``bindings=False`` for the **plain** signature -- every leg ``1-1`` and no key
     constraints -- i.e. the forgetful typed-causal-net reading (the CLI default; see
-    :mod:`cpm.signature_cli`)."""
+    the consumer's ``cpm.signature_cli``)."""
     gens: set[Generator] = set()
     activities = set(occn.input_groups) | set(occn.output_groups)
     for t in activities:

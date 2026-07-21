@@ -5,11 +5,11 @@ Two phases:
                           dependency graph (:class:`.fhm.OCDG`).
   * :mod:`.markers`    -- Listing-1.1 marker-group discovery -> :class:`.markers.OCCN`.
 And :mod:`.to_signature` lifts a mined OCCN into the cospan ``Signature`` used by
-the rest of :mod:`cpm.cospan`.
+the rest of :mod:`procposets.cospan`.
 
 Validated against the authors' reference implementation; the validation harness
-(oracle bridge, structural diff, visualisers, generated logs) lives in
-``sim/occn_dev/``. See ``sim/occn_dev/OCCN_DEV.md`` for the design/finding log.
+(oracle bridge, structural diff, visualisers, generated logs) lives in the
+consumer repo's ``sim/occn_dev/`` (see its ``OCCN_DEV.md`` for the design/finding log).
 """
 from .fhm import OCDG, mine_ocdg
 from .markers import OCCN, Marker, MarkerGroup, mine_occn

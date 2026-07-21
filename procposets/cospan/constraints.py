@@ -3,12 +3,13 @@
 A generator's boundary is a **multiset** of typed wires: each leg-port ``p`` carries
 an integer multiplicity variable ``n_p`` (the number of objects on that wire).
 ``Generator.left``/``right`` are the multiset *support*; the multiplicities are these
-variables, **default 1**, governed by :class:`~cpm.cospan.signature.LinearConstraint`.
+variables, **default 1**, governed by :class:`~procposets.cospan.signature.LinearConstraint`.
 The frontier (``Counter[Port]``) is the grounded multiset.
 
 Constraints are general linear type-inequalities ``Σ coeff·n_p <rel> rhs``. These
 builders cover the common cases; the OCCN bindings (cardinality intervals +
-shared-key partitions) are just particular instances -- see :func:`occn_leg_constraints`.
+shared-key partitions) are just particular instances -- see the OCCN leg-constraint
+builder in :mod:`procposets.occn.to_signature`.
 
 Authoring example::
 

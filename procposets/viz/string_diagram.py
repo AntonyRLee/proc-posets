@@ -2,7 +2,7 @@
 
 A quick visual checker for ``Sigma`` and ``F(Sigma)``: each generator
 (``def:generator-cospan-general``) renders as a labelled box whose left/right
-typed :class:`~cpm.cospan.signature.Port` triples are coloured wires; ``;``
+typed :class:`~procposets.cospan.signature.Port` triples are coloured wires; ``;``
 (sequential) chains boxes left-to-right joining matched ports; ``⊗`` (parallel)
 stacks them.  A legend maps object type -> colour.
 
@@ -1032,7 +1032,7 @@ def _binding_graphics(g) -> tuple[list, list]:
 
 
 def _leg_card_by_port(g) -> dict:
-    """Per-leg §32 binding cardinality keyed by :class:`~cpm.cospan.signature.Port`,
+    """Per-leg §32 binding cardinality keyed by :class:`~procposets.cospan.signature.Port`,
     e.g. ``{order_in: "[2,5]"}`` -- the label drawn *on* that leg's wire. Only
     single-leg unit-coefficient (cardinality) constraints; a leg pinned to the default
     ``(1,1)`` is dropped (it is the implicit 1:1, not a real binding)."""

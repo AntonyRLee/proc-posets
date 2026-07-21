@@ -1,6 +1,6 @@
 """Integer feasibility for leg-multiplicity constraint systems (§32).
 
-Given a set of :class:`~cpm.cospan.signature.LinearConstraint` over leg variables
+Given a set of :class:`~procposets.cospan.signature.LinearConstraint` over leg variables
 ``n_p`` (one per leg port), decide whether a satisfying non-negative integer
 assignment exists, exhibit a witness, and report each variable's feasible range.
 

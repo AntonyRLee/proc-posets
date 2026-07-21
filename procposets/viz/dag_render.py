@@ -326,7 +326,7 @@ def _splice_node(term, site: int) -> int:
 
 def render_splice_catalogue(rep, *, title: str = "", collapse: bool = True) -> str:
     """One model's closing catalogue as a **view over its**
-    :class:`~cpm.cospan.splice.SpliceRepresentation` (§27d): one cluster per
+    :class:`~procposets.cospan.splice.SpliceRepresentation` (§27d): one cluster per
     ``M(m,σ)`` family (its concrete pomset) with a dashed loop **splice-arc** at
     each anchor cut. Drawing from the rep means the figure and the serialized
     splice artifact share one source and cannot drift.
@@ -406,7 +406,7 @@ def render_loop_gallery(rep, *, title: str = "") -> str:
 
 def render_catalogue_dags(result: ExtractionResult, *, title: str = "") -> str:
     """Splice catalogue for a raw :class:`ExtractionResult` -- a thin wrapper
-    that builds the :class:`~cpm.cospan.splice.SpliceRepresentation` and renders
+    that builds the :class:`~procposets.cospan.splice.SpliceRepresentation` and renders
     it via :func:`render_splice_catalogue` (the single source of truth, §27d).
     Retained for callers/tests that start from an ``ExtractionResult``."""
     from ..cospan.splice import SpliceRepresentation

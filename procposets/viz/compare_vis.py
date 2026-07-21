@@ -1,8 +1,8 @@
-"""Render a :class:`cpm.cospan.signature_compare.ComparisonReport` as an
+"""Render a :class:`procposets.cospan.signature_compare.ComparisonReport` as an
 "at-a-glance" matrix: rows = canonical generators, columns = notations, each cell
 the generator's N-linear binding parameters, colour-coded against the reference.
 
-This is the comparison twin of :func:`cpm.vis.catalogue` (which draws *one*
+This is the comparison twin of the single-model ``catalogue`` renderer (which draws *one*
 signature's generator cospans). Here every notation's parameterised generators are
 laid out on the **same rows** -- so master vs OCCN vs OCPN is read down a column and
 the agreement/disagreement off the colour. Modular: a column per notation, however

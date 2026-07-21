@@ -8,7 +8,7 @@ LLM-free form of what ``occn_dev/run_dag_comparison.py`` and
 ``dag_render.render_catalogue_dags`` compute ad hoc. It is the **finite
 generating grammar of the model's trace language** (§27c): a run γ1→γ2 is a
 family baseline with its anchored loops spliced in (any multiplicity). The
-companion :mod:`cpm.cospan.trace_language` consumes the *algebraic* form to emit
+companion :mod:`procposets.cospan.trace_language` consumes the *algebraic* form to emit
 traces up to a finite loop cut-off.
 
 Two views per fragment:
@@ -56,7 +56,7 @@ from .signature_diff import label_skeleton, strip_boundary_wrapper
 
 # An algebraic step: a single activity label, or a tensor group of concurrent
 # labels (canonically sorted). A loop/spine body is a sequence of these.
-Step = "str | tuple[str, ...]"
+Step = str | tuple[str, ...]
 
 
 def _is_wrapper_label(label: str) -> bool:

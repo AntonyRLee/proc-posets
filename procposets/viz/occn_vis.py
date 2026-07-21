@@ -2,7 +2,7 @@
 heuristic/causal-net rendering that is our alternative to the Java/React
 reference (Liss et al.; driven separately by ``occn_dev/native_viz.py``).
 
-``draw_occn`` takes a :class:`cpm.occn.OCCN` (from :func:`cpm.occn.mine_occn`)
+``draw_occn`` takes a :class:`procposets.occn.OCCN` (from :func:`procposets.occn.mine_occn`)
 and saves a PNG. Visual vocabulary (mirrors the reference's input-left /
 output-right model):
 
