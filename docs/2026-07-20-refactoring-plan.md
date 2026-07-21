@@ -479,7 +479,9 @@ before/after `repr()` capture **byte-identical** + full suite green.
 helpers and adapter build/validate wrappers ([pm4py]/[graph] — skip standalone);
 `cospan/_boundary.py` constants single-source; tree-block flatten skeleton
 (`matrix._block_sequence`/`discrete._block_items` — windowing part is
-`changes-values`).
+`changes-values`). **→ The first three landed 2026-07-21 once the golden-path fix
+made them byte-verifiable; see "Phase 2 leftovers" in the execution log below. Only
+the `changes-values` tree-block flatten remains deferred.**
 
 ### Phase 3 — maintainability, types, docs, landed 2026-07-21 (suite: 343 passed, 20 skipped)
 Each split is a pure extraction; float/structure-sensitive ones gated by a fixed-seed
@@ -596,3 +598,40 @@ globals→config-dataclass conversion first — which the plan scopes as **Phase
 override API (the viz goldens render with defaults, so they wouldn't catch it) or an
 untested semantic rewrite. Decision (2026-07-21): **defer to Phase 4**. The override API
 is currently unused by any on-disk consumer, but is documented + Phase-4-sequenced.
+
+### Phase 2 leftovers — the now-unblocked [graph]/[pm4py] dedups, landed 2026-07-21 (suite: 356 passed, 13 skipped)
+Previously deferred as "can't byte-verify standalone"; the Phase-6 golden-path fix
+(`c440f4c`) made them verifiable against the live `sim/cpm`, and all three run under the
+now-live cospan goldens. Consumer end-gate re-run: poset-mixture-npmle **201 passed** +
+spm/experiments **54 passed**, both unchanged.
+- **OCCN→cospan lift helpers → `occn/_lift.py`** (`751852b`) — `to_signature.py` and
+  `unroll_occn.py` carried char-identical `_types`/`_type_balanced`/`_in_port`/`_out_port`
+  and a byte-identical `_boundary_generators` (unroll's docstring literally said
+  "Mirrors …"). Extracted all five; constraint *tails* stay separate (`_leg_constraints`
+  per-key partition vs `_firing_system` per-type conservation). `_lift` imports only down
+  into `cospan.signature` (miner→algebra preserved). Gate: PYTHONHASHSEED=0 before/after
+  canonical-key capture over a synthetic OCCN corpus (occn_to_signature bindings on/off,
+  ground_occn, ground_run, gamma_boundary) byte-identical. `_in_port`/`_out_port` stay
+  importable from `to_signature` (re-export) so `test_cpm_constraints` is unaffected.
+- **Boundary labels → `cospan/_boundary.py`** (`d575ccb`) — `GAMMA1`/`GAMMA2`/
+  `BOUNDARY_PREFIXES` lived in ≥2 places; `engine.py` kept a local `GAMMA2 = "gamma2"`
+  with a "kept in sync … to avoid an import cycle" comment (the cycle being that
+  `occurrence` imports networkx, so numpy-only `engine` couldn't import from it). New
+  dependency-free leaf both layers import: engine/engine_fast (via re-export) stay
+  networkx-free, occurrence/splice re-export the objects. `DAG_BOUNDARY_MARKERS` now
+  derives as `BOUNDARY_PREFIXES + (GAMMA1, GAMMA2)`. Identity constants → value-neutral;
+  layer guards + B0/B1 goldens green.
+- **Adapter build-and-validate wrappers → `cospan/_lmgraph_build.py`** (`9853505`) — the
+  six `lmgraph_from_*` wrappers (build/overlay/validate) and the triplicated
+  `pre = f"{otype}__" if otype is not None else ""` → `_assemble`/`_assemble_single`/
+  `_type_prefix`. Helper lives under `cospan/` (not `adapters/`) so B0 `from_petri` shares
+  it without `import procposets.adapters` pulling pm4py — verified `from_petri` imports
+  with none of pm4py/networkx/matplotlib in `sys.modules`. Gate: deterministic before/after
+  LMGraph-key capture (process-tree + petri) byte-identical + in-process equivalence
+  self-check for **all three** adapters incl BPMN (wrapper == old inline body on the same
+  model object, pinning pm4py's per-process UUIDs) ALL-EQUAL. The `"{otype}__"` prefix is
+  load-bearing for signature comparison and unchanged.
+
+**Phase 2 fully landed except** the tree-block flatten skeleton
+(`matrix._block_sequence`/`discrete._block_items`) — its windowing part is
+`changes-values`, so it stays deferred (not a clean value-preserving dedup).
