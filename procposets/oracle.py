@@ -136,6 +136,17 @@ class Oracle:
                 "(no mechanistic timed kernel is declared yet; see ROADMAP)"
             )
 
+        rels = self._select_candidates(cls, timed, max_exact_m, closure_cap, force_regime)
+        self._build_atoms(rels, els, cls)
+
+    # ------------------------------------------------------------------ #
+
+    def _select_candidates(self, cls, timed: bool, max_exact_m: int,
+                           closure_cap: int, force_regime: Optional[str]) -> List[Rel]:
+        """Regime dispatch: choose the candidate relation set, and set
+        ``self.kind`` / ``self.exact`` (enumeration and meet-closure are exact,
+        lattice-heuristic is not)."""
+        log = self.log
         if force_regime == "lattice-heuristic":
             rels = self._lattice_candidates()
             self.kind = "lattice-heuristic"
@@ -143,7 +154,7 @@ class Oracle:
             rels = cls.enumerate(log.alphabet)
             self.kind = "enumeration"
         elif (cls.contains_all_posets and cls.closed_under_meet
-              and noise_kernel == "uniform" and not timed):
+              and self.noise_kernel == "uniform" and not timed):
             # capability-flag dispatch: the reduction theorem needs a class
             # that contains every poset and is closed under meet -- declared
             # on the class, not encoded as pointer identity (W18)
@@ -156,8 +167,14 @@ class Oracle:
             rels = self._lattice_candidates()
             self.kind = "lattice-heuristic"
         self.exact = self.kind in ("enumeration", "meet-closure")
+        return rels
 
-        # build atoms and precompute the (atoms x groups) log-density matrix
+    def _build_atoms(self, rels: Iterable[Rel], els, cls) -> None:
+        """Build the atom list (each candidate poset crossed with the (eps, eta,
+        lam) nuisance grid) and precompute the ``(atoms x groups)`` log-density
+        matrix ``self.logF``.  A candidate too wide for exact e(P) is skipped and
+        downgrades a meet-closure certificate to heuristic."""
+        log = self.log
         self.atoms: List[Atom] = []
         self.budget_skipped = 0
         inL_cache = {}
@@ -165,9 +182,8 @@ class Oracle:
             try:
                 a0 = make_atom(els, rel, 0.0, 0.0, poset_class=cls)
             except IdealBudgetExceeded:
-                # candidate too wide for exact e(P) on the declared budget:
-                # skipped, and the certificate is downgraded loudly below
-                # rather than hanging the DP (W12.1)
+                # too wide for exact e(P) on the declared budget: skipped, and the
+                # certificate is downgraded loudly below rather than hanging (W12.1)
                 self.budget_skipped += 1
                 continue
             if a0 is None:
