@@ -181,11 +181,6 @@ def sample_extension_tree(tree: SPTree, rng) -> Tuple[str, ...]:
     return tuple(next(its[i]) for i in labels)
 
 
-# Back-compat alias for the historical untyped public name (the exported
-# ``procposets.sample_extension`` binds the SPTree sampler; consumers import it).
-sample_extension = sample_extension_tree
-
-
 # ---------------------------------------------------------------------------
 # Exhaustive enumeration of SP posets on a labeled alphabet
 # ---------------------------------------------------------------------------

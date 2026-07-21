@@ -46,7 +46,6 @@ from .rel import (
     refines,
     rel_from_trace,
     respects,
-    sample_extension,
     sample_extension_tree,
     sample_linear_extension,
     series,
@@ -141,7 +140,7 @@ __all__ = [
     "GENERAL", "SP",
     # SP-tree view
     "SPTree", "decompose", "is_sp", "extension_count",
-    "sample_extension", "sample_extension_tree",
+    "sample_extension_tree",
     "tree_relations", "series", "parallel", "enumerate_sp",
     # canonical Poset
     "Poset", "leaf", "then", "par", "n_poset", "from_dag", "from_edges",

@@ -44,7 +44,6 @@ atom on all groups is one small matrix product.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from math import exp, factorial, log as _ln
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -95,15 +94,6 @@ class Atom:
         tag = "" if self.noise_kernel == "uniform" else f", noise={self.noise_kernel}"
         tag += "" if self.lam == 1.0 else f", lam={self.lam:g}"
         return f"{self.desc}  [e={self.e}, eps={self.eps:g}, eta={self.eta:g}{tag}]"
-
-    @property
-    def noise(self) -> str:
-        """Deprecated alias for :attr:`noise_kernel` (removed at consumer cut-over)."""
-        warnings.warn(
-            "Atom.noise is deprecated; use Atom.noise_kernel",
-            DeprecationWarning, stacklevel=2,
-        )
-        return self.noise_kernel
 
 
 class GroupedLog:
@@ -233,28 +223,12 @@ def make_atom(
     noise_kernel: str = "uniform",
     poset_class=GENERAL,
     lam: float = 1.0,
-    *,
-    noise: str | None = None,
 ) -> Optional[Atom]:
     """Build an atom from a relation set.
 
     Returns None if the declared hypothesis class does not contain the order
     (only possible for the SP class; the general class contains everything).
-
-    ``noise`` is the deprecated spelling of ``noise_kernel`` (kept one release for
-    back-compat; removed at consumer cut-over).
     """
-    if noise is not None:
-        if noise_kernel != "uniform":
-            raise TypeError(
-                "make_atom(): pass noise_kernel, not both noise_kernel and the "
-                "deprecated noise"
-            )
-        warnings.warn(
-            "make_atom(noise=...) is deprecated; use noise_kernel=...",
-            DeprecationWarning, stacklevel=2,
-        )
-        noise_kernel = noise
     cls = get_poset_class(poset_class)
     assert is_partial_order(elements, rel), (
         f"relation set is not a transitively closed partial order on "

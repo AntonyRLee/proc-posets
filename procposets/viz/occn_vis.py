@@ -30,9 +30,6 @@ def colour_map(otypes) -> dict[str, str]:
     return {ot: _PALETTE[i % len(_PALETTE)] for i, ot in enumerate(sorted(otypes))}
 
 
-color_map = colour_map  # back-compat alias (removed at consumer cut-over)
-
-
 @contextlib.contextmanager
 def _themed_ocpn_colors(otypes):
     """Temporarily override pm4py's OCPN object-type colouring (which is a

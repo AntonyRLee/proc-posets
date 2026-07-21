@@ -48,11 +48,6 @@ def trivial_report(log: GroupedLog, fit: FitResult, eps: float) -> str:
     )
 
 
-# back-compat alias (removed at each consumer's cut-over); the historical name is
-# imported by the PMN demos via poset_mixture.diagnostics == procposets.diagnostics.
-report_vs_trivial = trivial_report
-
-
 def recovery_report(fit: FitResult, true_trees: Sequence[SPTree],
                     true_weights: Sequence[float], min_weight: float = 0.01) -> str:
     """Match the *poset marginal* of the fit to ground truth.

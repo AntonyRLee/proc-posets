@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 from ._extensions import preds as _preds
-from .rel import SPTree, sample_extension
+from .rel import SPTree, sample_extension_tree
 
 
 @dataclass
@@ -39,7 +39,7 @@ class TrueMixture:
     def sample_trace(self, k: int, rng: random.Random, eps_sim: float = 0.0):
         """A uniform linear extension of component ``k`` as a label word, with an
         optional ``eps_sim`` chance of one adjacent transposition (recording noise)."""
-        t = list(sample_extension(self.trees[k], rng))
+        t = list(sample_extension_tree(self.trees[k], rng))
         if eps_sim > 0 and rng.random() < eps_sim and len(t) > 1:
             i = rng.randrange(len(t) - 1)
             t[i], t[i + 1] = t[i + 1], t[i]

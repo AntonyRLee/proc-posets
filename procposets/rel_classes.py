@@ -16,7 +16,7 @@ from .rel import (
     enumerate_posets,
     sample_linear_extension,
 )
-from .rel_sp import decompose, enumerate_sp, extension_count, sample_extension
+from .rel_sp import decompose, enumerate_sp, extension_count, sample_extension_tree
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ class SPPosets(PosetClass):
         tree = decompose(elements, rel)
         if tree is None:
             raise ValueError("relation set is not series-parallel")
-        return sample_extension(tree, rng)
+        return sample_extension_tree(tree, rng)
 
 
 GENERAL = GeneralPosets()

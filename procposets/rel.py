@@ -254,7 +254,6 @@ from .rel_sp import (  # noqa: E402
     extension_count,
     is_sp,
     parallel,
-    sample_extension,
     sample_extension_tree,
     series,
     tree_relations,

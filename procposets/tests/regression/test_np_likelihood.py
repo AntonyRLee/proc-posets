@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import itertools
 import math
-import warnings
 from collections import Counter
 
 import numpy as np
@@ -463,26 +462,3 @@ def test_make_atom_asserts_partial_order():
     broken = frozenset({("a", "b"), ("b", "c")})  # missing (a, c)
     with pytest.raises(AssertionError, match="transitively closed"):
         make_atom(frozenset("abc"), broken, 0.0, 0.0)
-
-
-def test_noise_kernel_deprecation_shim():
-    # Phase-4 item 4: noise -> noise_kernel behind deprecation shims.
-    ab = frozenset("ab")
-    # canonical spelling: no warning
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        a = make_atom(ab, frozenset(), 0.1, 0.0, noise_kernel="swap")
-    assert a.noise_kernel == "swap"
-
-    # deprecated make_atom(noise=) still works, but warns
-    with pytest.warns(DeprecationWarning, match="noise_kernel"):
-        b = make_atom(ab, frozenset(), 0.1, 0.0, noise="swap")
-    assert b.noise_kernel == "swap"
-
-    # deprecated .noise read returns noise_kernel, but warns
-    with pytest.warns(DeprecationWarning, match="noise_kernel"):
-        assert b.noise == "swap"
-
-    # passing both (non-default) is a TypeError
-    with pytest.raises(TypeError, match="not both"):
-        make_atom(ab, frozenset(), 0.1, 0.0, noise_kernel="swap", noise="uniform")
