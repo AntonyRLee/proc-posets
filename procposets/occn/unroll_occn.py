@@ -14,25 +14,8 @@ from __future__ import annotations
 from ..cospan.constraints import constraint, cset, interval
 from ..cospan.signature import Generator, Port, Signature
 from ..cospan.unroll_core import unroll_generator
+from ._lift import _boundary_generators, _in_port, _out_port, _type_balanced, _types
 from .markers import OCCN, MarkerGroup
-
-
-def _types(group: MarkerGroup) -> frozenset[str]:
-    return frozenset(m.otype for m in group)
-
-
-def _type_balanced(ig: MarkerGroup, og: MarkerGroup) -> bool:
-    if not ig or not og:
-        return True
-    return _types(ig) == _types(og)
-
-
-def _in_port(t: str, m) -> Port:
-    return Port(m.activity, m.otype, t)
-
-
-def _out_port(t: str, m) -> Port:
-    return Port(t, m.otype, m.activity)
 
 
 def _firing_system(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
@@ -58,23 +41,6 @@ def _firing_system(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
                 coeffs[p] = coeffs.get(p, 0) - 1
         cons.append(constraint(coeffs, "==", 0))
     return cset(*cons)
-
-
-def _boundary_generators(occn: OCCN) -> set[Generator]:
-    """``START_<ot>``/``END_<ot>`` sources/sinks, weight 1 (one object per firing; a
-    bundle of ``k`` objects enters as ``k`` firings, which token accumulation supplies).
-    Mirrors :func:`procposets.occn.to_signature._boundary_generators`."""
-    gens: set[Generator] = set()
-    ocdg = occn.ocdg
-    for otype, start_node in ocdg.starts.items():
-        for src, ot, tgt in ocdg.arcs:
-            if src == start_node and ot == otype:
-                gens.add(Generator(start_node, frozenset(), frozenset({Port(start_node, otype, tgt)})))
-    for otype, end_node in ocdg.ends.items():
-        for src, ot, tgt in ocdg.arcs:
-            if tgt == end_node and ot == otype:
-                gens.add(Generator(end_node, frozenset({Port(src, otype, end_node)}), frozenset()))
-    return gens
 
 
 def _interior_generators(occn: OCCN, *, order: int, max_assignments: int) -> set[Generator]:
