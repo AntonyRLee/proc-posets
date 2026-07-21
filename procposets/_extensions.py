@@ -17,7 +17,7 @@ counter, not around it.
 
 from __future__ import annotations
 
-from typing import Dict, FrozenSet, Iterable, List, Optional, Tuple
+from typing import Dict, FrozenSet, Iterable, List, Tuple
 
 # Hard ceiling on the ideal-lattice DP's state count.  The DP is exponential
 # only in poset width; the meet-closure oracle runs at *any* m, where meets of
@@ -53,25 +53,40 @@ def ideal_state_bound(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> in
     knob -- ``rel.MAX_IDEAL_STATES`` / the module default).
     """
     remaining = set(elements)
+    # successor adjacency built ONCE (was rebuilt from `pairs` on every peel);
+    # per-node order follows the `pairs` iteration order exactly as before, so the
+    # greedy chain choice -- hence the integer bound -- is byte-identical.
+    adj: Dict = {e: [] for e in remaining}
+    for a, b in pairs:
+        if a in adj and b in adj:
+            adj[a].append(b)
     bound = 1
     while remaining:
-        succs = {e: [b for (a, b) in pairs if a == e and b in remaining]
-                 for e in remaining}
+        succs = {e: [b for b in adj[e] if b in remaining] for e in remaining}
+        # longest-path DP, iterative post-order (was a recursion that hit
+        # RecursionError on a chain longer than the interpreter's limit). Same
+        # first-argmax tie-break (cand > ln), so best[] and the peeled chain match.
         best: Dict = {}
+        for root in remaining:
+            if root in best:
+                continue
+            stack = [(root, False)]
+            while stack:
+                x, done = stack.pop()
+                if done:
+                    ln, nxt = 1, None
+                    for y in succs[x]:
+                        cand = 1 + best[y][0]
+                        if cand > ln:
+                            ln, nxt = cand, y
+                    best[x] = (ln, nxt)
+                elif x not in best:
+                    stack.append((x, True))
+                    for y in succs[x]:
+                        if y not in best:
+                            stack.append((y, False))
 
-        def longest(x) -> int:
-            got = best.get(x)
-            if got is not None:
-                return got[0]
-            ln, nxt = 1, None
-            for y in succs[x]:
-                cand = 1 + longest(y)
-                if cand > ln:
-                    ln, nxt = cand, y
-            best[x] = (ln, nxt)
-            return ln
-
-        top = max(remaining, key=longest)
+        top = max(remaining, key=lambda x: best[x][0])
         chain = [top]
         while best[chain[-1]][1] is not None:
             chain.append(best[chain[-1]][1])

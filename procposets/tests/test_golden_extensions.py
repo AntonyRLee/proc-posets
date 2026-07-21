@@ -103,6 +103,18 @@ def test_linear_extensions_below_budget_byte_unchanged():
     assert len(set(les)) == 720                              # all distinct (distinct labels)
 
 
+def test_ideal_state_bound_tall_chain_no_recursion_error():
+    """Phase-7 #3: ideal_state_bound's longest-path DP is iterative, so a chain
+    taller than the interpreter's recursion limit returns its bound (chain+1
+    ideals) instead of the RecursionError the old recursive `longest` raised."""
+    from procposets import poset
+    from procposets._extensions import ideal_state_bound
+    n = 1800  # > sys.getrecursionlimit() default (1000)
+    less = {(i, j) for i in range(n) for j in range(i + 1, n)}  # chain closure, built directly
+    P = poset.Poset(list(range(n)), {i: f"n{i}" for i in range(n)}, less)
+    assert ideal_state_bound(P.elements, P.less) == n + 1  # a chain has n+1 ideals
+
+
 def test_transitive_closure_helper_is_shared():
     """from_dag and from_edges route through the one helper and still build
     the correct closed order."""
