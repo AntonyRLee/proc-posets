@@ -10,9 +10,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
-from .poset import Poset
-
-Model = list
+from .poset import Model, Poset
 
 
 def linear_extensions(P: Poset) -> list[tuple[str, ...]]:

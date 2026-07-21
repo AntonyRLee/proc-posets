@@ -39,6 +39,13 @@ class Poset:
         return len(self.elements)
 
 
+# A *model* is a weighted set of labelled posets (its variants): the object the
+# distance / estimation / trace / loop layers all operate on.  Single home for the
+# alias that four of those modules each used to redefine (and ``traces`` weakened
+# to a bare ``list``).  Annotation-only -- never constructed at runtime.
+Model = list[tuple[Poset, float]]
+
+
 def _transitive_closure(less: set) -> set:
     """Close a set of ``(u, v)`` = "u < v" pairs under transitivity, in place.
 

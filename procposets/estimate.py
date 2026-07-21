@@ -27,10 +27,9 @@ import math
 import random
 from collections import Counter, defaultdict
 
-from .poset import Poset
+from .poset import Model, Poset
 from .traces import linear_extensions, trace_distribution
 
-Model = list[tuple[Poset, float]]
 Trace = tuple[str, ...]
 Law = dict[Trace, float]
 

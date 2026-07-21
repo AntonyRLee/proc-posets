@@ -12,9 +12,7 @@ from __future__ import annotations
 import math
 
 from .matrix import END, START, build, normal_form_distribution
-from .poset import Poset
-
-Model = list[tuple[Poset, float]]
+from .poset import Model
 
 # Matrix normalisation on the common state space (docs/DESIGN-comparison-object.md, TODO §8):
 #   "selfloop" (option 1) -- unused state s -> s; END -> END (absorbing). Distance-paper convention.
