@@ -67,9 +67,13 @@ def _alphabet(model):
     return sorted(V)
 
 
-def _pair_relation(P: Poset, x: str, y: str) -> str:
-    """'lt' if x<y, 'gt' if y<x, else 'par' (incomparable), by label in a distinct-label poset."""
-    inv = {lab: e for e, lab in P.labels.items()}
+def _pair_relation(P: Poset, x: str, y: str, inv=None) -> str:
+    """'lt' if x<y, 'gt' if y<x, else 'par' (incomparable), by label in a distinct-label poset.
+
+    ``inv`` (label->element) may be supplied to skip rebuilding it per call -- it
+    depends only on ``P``, so a caller looping over many (x, y) hoists it once."""
+    if inv is None:
+        inv = {lab: e for e, lab in P.labels.items()}
     ex, ey = inv[x], inv[y]
     if (ex, ey) in P.less:
         return "lt"
@@ -82,11 +86,16 @@ def precedence(model):
     """For each unordered label pair, the rho-weighted categorical over {lt, gt, par}."""
     V = _alphabet(model)
     tot = sum(w for _, w in model) or 1.0
+    # inv depends only on P, not the (x, y) pair, so build it once per variant
+    # instead of rebuilding it inside the C(|V|,2)*|model| inner loop.  The
+    # pair-outer / variant-inner order is unchanged, so cat[rel] += w/tot
+    # accumulates the identical float contributions in the identical order.
+    invs = [{lab: e for e, lab in P.labels.items()} for P, _ in model]
     out = {}
     for x, y in combinations(V, 2):
         cat = {"lt": 0.0, "gt": 0.0, "par": 0.0}
-        for P, w in model:
-            cat[_pair_relation(P, x, y)] += w / tot
+        for (P, w), inv in zip(model, invs):
+            cat[_pair_relation(P, x, y, inv)] += w / tot
         out[(x, y)] = cat
     return out
 
