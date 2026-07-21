@@ -55,6 +55,22 @@ def _row_angle(row1: dict[str, float], row2: dict[str, float], keys) -> float:
     return math.acos(_clamp01(_bc(row1, row2, keys)))
 
 
+def _row_angle_sparse(row1: dict[str, float], row2: dict[str, float], key_idx: dict) -> float:
+    """Sparse twin of :func:`_row_angle`, byte-identical in value over a large sorted
+    state space.  ``_bc`` walks all ``keys`` even though the augmented rows are sparse
+    (a block transitions to a handful of successors), so the dense form is O(|keys|)
+    per row -> O(|X|^2) overall.  Here BC is summed only over the keys present in BOTH
+    rows AND in ``keys`` (``key_idx`` maps each dense key to its position; build it once
+    per matrix comparison).  This is exact: the dropped terms are all ``sqrt(0*x)=0.0``
+    -- ``_bc`` already ignores any key not in ``keys`` -- and a running float sum starts
+    at 0 with ``x + 0.0 == x``, so ordering the retained terms by ``key_idx`` reproduces
+    ``_bc``'s exact accumulation.  (Note: NOT ``_pairwise_rows`` -- that path's
+    dict-insertion-order sum and equal-row skip are changes-values.)"""
+    common = set(row1).intersection(row2, key_idx)
+    bc = sum(math.sqrt(row1[k] * row2[k]) for k in sorted(common, key=key_idx.__getitem__))
+    return math.acos(_clamp01(bc))
+
+
 def _bhattacharyya_angle(p: dict[str, float], q: dict[str, float]) -> float:
     """The single-vector Bhattacharyya angle ``2*arccos(BC)`` over ``set(p)|set(q)``
     -- the Result-1 form shared by :func:`bhattacharyya_angle` and
@@ -88,10 +104,11 @@ def smd_rows(built1, built2, mode: Optional[Mode] = None, normalize: bool = Fals
     if states is None:
         states = sorted(set(s1) | set(s2))
     a1, a2 = _augment(m1, states, mode), _augment(m2, states, mode)
+    key_idx = {s: i for i, s in enumerate(states)}  # dense-key positions, built once
     total = 0.0
     per_block: dict[str, float] = {}
     for s in states:
-        ang = _row_angle(a1[s], a2[s], states)
+        ang = _row_angle_sparse(a1[s], a2[s], key_idx)
         per_block[s] = ang
         total += ang * ang
     scale = 1.0 / math.sqrt(len(states)) if normalize else 1.0

@@ -37,7 +37,7 @@ import math
 from itertools import combinations
 from typing import Literal
 
-from .distance import _augment, _row_angle
+from .distance import _augment, _row_angle, _row_angle_sparse
 from .matrix import END, START, build
 from .moddecomp import Parallel, Prime, Series, decompose
 from .poset import Poset
@@ -137,10 +137,11 @@ def _support_uniformise(row):
 
 
 def _matrix_angle(a1, a2, states):
+    key_idx = {s: i for i, s in enumerate(states)}  # dense-key positions, built once
     total = 0.0
     per = {}
     for s in states:
-        ang = _row_angle(a1[s], a2[s], states)
+        ang = _row_angle_sparse(a1[s], a2[s], key_idx)
         per[s] = ang
         total += ang * ang
     return 2.0 * math.sqrt(total), per
