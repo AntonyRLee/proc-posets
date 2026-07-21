@@ -167,7 +167,7 @@ class Oracle:
         log = self.log
         self.atoms: List[Atom] = []
         self.budget_skipped = 0
-        inL_cache = {}
+        in_L_cache = {}
         for rel in rels:
             try:
                 a0 = make_atom(els, rel, 0.0, 0.0, poset_class=cls)
@@ -178,7 +178,7 @@ class Oracle:
                 continue
             if a0 is None:
                 continue  # outside the declared class (SP only): skipped by design
-            inL_cache[rel] = log.in_L(rel)
+            in_L_cache[rel] = log.in_L(rel)
             for eps in self.eps_grid:
                 for eta in self.eta_grid:
                     for lam in self.lam_grid:
@@ -198,7 +198,7 @@ class Oracle:
             self.kind = "lattice-heuristic"
             self.exact = False
         self.logF = np.stack(
-            [log.group_logf(a, inL_cache[a.rel]) for a in self.atoms]
+            [log.group_logf(a, in_L_cache[a.rel]) for a in self.atoms]
         )  # (A, G)
 
     # ------------------------------------------------------------------ #

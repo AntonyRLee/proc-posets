@@ -119,6 +119,13 @@ from . import _extensions as _ext  # noqa: E402
 
 
 def count_linear_extensions(elements, rel) -> int:
+    """Rel-view spelling of e(P) (the number of linear extensions).
+
+    Same guarded ideal-lattice DP engine (``_extensions.count_extensions``) as the
+    canonical Poset-object spelling :func:`procposets.count_extensions`; kept under
+    its historical NPMLE name as a documented alias. See
+    :func:`procposets.rel_sp.extension_count` for the SP closed-form spelling.
+    """
     return _ext.count_extensions(elements, rel, max_states=MAX_IDEAL_STATES)
 
 

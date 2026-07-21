@@ -179,10 +179,10 @@ class GroupedLog:
             self._n1_cache[rel] = (ind, max(len(n1), 1))
         return self._n1_cache[rel]
 
-    def trace_p(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def trace_p(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         """Per-distinct-trace probability under atom (with eps and eta mixed in)."""
-        if inL is None:
-            inL = self.in_L(atom.rel)
+        if in_L is None:
+            in_L = self.in_L(atom.rel)
         if atom.eps == 0.0:
             contamination = 0.0  # kernel is density-neutral at eps = 0:
             #                      skip it (avoids the N1 enumeration)
@@ -196,12 +196,12 @@ class GroupedLog:
                 f"unknown noise kernel {atom.noise!r}: the declared kernels "
                 f"are 'uniform' and 'swap'"
             )
-        clean = (1.0 - atom.eps) * inL / atom.e + atom.eps * contamination
+        clean = (1.0 - atom.eps) * in_L / atom.e + atom.eps * contamination
         return (1.0 - atom.eta) * clean + atom.eta * self.pbar
 
-    def group_logf(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def group_logf(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         """Vector over groups: log f_theta(g)."""
-        p = self.trace_p(atom, inL)
+        p = self.trace_p(atom, in_L)
         with np.errstate(divide="ignore"):
             logp = np.log(p)
         out = self.counts @ np.where(np.isfinite(logp), logp, -1e30)
@@ -319,15 +319,15 @@ class TimedGroupedLog(GroupedLog):
             self._k_cache[rel] = out
         return self._k_cache[rel]
 
-    def group_logf(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def group_logf(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         # Evaluated entirely in log space: the previous linear-space form
         # (lam**m, exp(-lam <k, gaps>)) overflowed for large m log(lam) and
         # underflowed to an exact 0.0 -- hence a spurious -inf group density
         # -- for lam <k, gaps> beyond ~745 (DESIGN_REVIEW W6).
         if atom.noise == "swap":
             raise ValueError("timed traces support only the uniform eps kernel")
-        if inL is None:
-            inL = self.in_L(atom.rel)
+        if in_L is None:
+            in_L = self.in_L(atom.rel)
         ks = self._k_vectors(atom.rel)
         lam, lbar, m = atom.lam, self.pooled_rate, self.m
         neg_inf = float("-inf")
@@ -351,7 +351,7 @@ class TimedGroupedLog(GroupedLog):
                     log_w_eps + log_gbar,
                     log_eta + ln0(self.pbar[ti]) + log_gbar,
                 ]
-                if inL[ti]:
+                if in_L[ti]:
                     terms.append(
                         log_w_clean + log_lam_m - lam * float(np.dot(ks[ti], gaps))
                     )

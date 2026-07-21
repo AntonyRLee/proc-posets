@@ -85,7 +85,15 @@ def leaf(label: str) -> Poset:
 
 
 def then(*parts: Poset) -> Poset:
-    """Sequential composition: part_0 < part_1 < ... (ordinal sum)."""
+    """Sequential composition of ``Poset`` objects: part_0 < part_1 < ... (ordinal sum).
+
+    The ``Poset``-object (id+label, repeated-label-capable) series combinator,
+    rendered via the moddecomp ``;``/``*`` view. Intentionally named ``then``/``par``
+    per this type -- the distinct-label ``SPTree`` combinators are
+    :func:`procposets.rel_sp.series` / :func:`procposets.rel_sp.parallel` (and the
+    package-root ``series``/``parallel`` bind THOSE), so the two SP-composition
+    vocabularies are NOT interchangeable.
+    """
     parts = [_fresh(p) for p in parts]
     elements: list[int] = []
     labels: dict[int, str] = {}
@@ -103,7 +111,10 @@ def then(*parts: Poset) -> Poset:
 
 
 def par(*parts: Poset) -> Poset:
-    """Parallel composition: disjoint union, no cross relations (antichain of blocks)."""
+    """Parallel composition of ``Poset`` objects: disjoint union, no cross relations
+    (antichain of blocks). The ``Poset``-object parallel combinator; named ``par``
+    (not ``parallel``) because the ``parallel`` name is the ``SPTree`` constructor
+    :func:`procposets.rel_sp.parallel` -- see :func:`then`."""
     parts = [_fresh(p) for p in parts]
     elements: list[int] = []
     labels: dict[int, str] = {}

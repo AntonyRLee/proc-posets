@@ -116,6 +116,14 @@ def is_sp(elements: FrozenSet[str], rel: Rel) -> bool:
 # ---------------------------------------------------------------------------
 
 def extension_count(tree: SPTree) -> int:
+    """SP closed-form spelling of e(P) for a series-parallel tree.
+
+    Agrees with :func:`procposets.count_extensions` /
+    :func:`procposets.count_linear_extensions` on SP posets, but is the ungated
+    linear-time VTL recursion (series: product of children; parallel: multinomial
+    interleavings) -- a SEPARATE function by design; do not collapse it into the
+    guarded ideal-lattice DP engine.
+    """
     if tree.kind == "leaf":
         return 1
     if tree.kind == "series":
@@ -222,6 +230,12 @@ def enumerate_sp(elements: Iterable[str]) -> List[Rel]:
 # ---------------------------------------------------------------------------
 
 def series(*parts) -> SPTree:
+    """Series composition of ``SPTree`` nodes (the distinct-label ``->``/``||`` view).
+
+    The ``SPTree`` constructor bound as the package-root ``procposets.series``.
+    Distinct from the ``Poset``-object combinator :func:`procposets.poset.then` --
+    same SP concept, different type/renderer; the two are intentionally NOT unified.
+    """
     kids = tuple(p if isinstance(p, SPTree) else SPTree("leaf", label=p) for p in parts)
     flat: List[SPTree] = []
     for k in kids:
@@ -230,6 +244,11 @@ def series(*parts) -> SPTree:
 
 
 def parallel(*parts) -> SPTree:
+    """Parallel composition of ``SPTree`` nodes (children sorted for canonicity).
+
+    The ``SPTree`` constructor bound as the package-root ``procposets.parallel``; the
+    ``Poset``-object counterpart is :func:`procposets.poset.par` (see :func:`series`).
+    """
     kids = tuple(p if isinstance(p, SPTree) else SPTree("leaf", label=p) for p in parts)
     return SPTree("parallel", children=tuple(sorted(kids, key=str)))
 
