@@ -731,3 +731,31 @@ deferred, flatten skipped.
   PMN 201; SPM 54; procposets 358/13. The refactor reproduces end-to-end across all repos.
 
 **Next:** Phase 7 (efficiency stress map). The HOLD is lifted — everything reproduces.
+
+### Phase 7 — efficiency stress map, LANDED 2026-07-21 (suite 362 passed / 13 skipped)
+A 13-agent read-only stress-map recon (wf_af2f9c31-515) characterised each §7 seed against the current
+code. **6 of 13 were already dead** (#1 Phase-0 cap; #8 warm-start already implemented; #10 walled/cached
+/linear; #11 small-m + Phase-4 dedup; #5/#12 polynomial/O(1)-default). Of the 7 live, only #6/#13(D)/#9
+were genuinely factorial. All speedups value-preserving, golden- or capture-gated:
+- **#6 `traces.linear_extensions`** (`73dd2a7`) — guarded materialisation twin: `count_extensions` pre-check
+  (golden pins == len) + `MAX_LINEAR_EXTENSIONS=1e6`; measured OOM cliff at N=11 (39.9M words), now refuses
+  in 0.007s.
+- **#13(D) `splice._count_linear_extensions`** (`df32f6c`) — ideal-DP swap for `nx.all_topological_sorts`
+  count (O(2^width) vs width! sorts); byte-exact, cap_nodes=11 kept.
+- **#5 `discrete._pair_relation`** (`913030e`) — hoist label->element inv out of the pair×variant loop.
+- **#4 `simulate.one_timed`** (`1b570b5`) — hoist preds/succs + incremental frontier; rng-free, seeded
+  output byte-identical (capture).
+- **#7 `distance.smd_rows`/`_matrix_angle`** (`6498bed`) — sparse BC row-angle twin (row1∩row2∩keys ordered
+  by position); byte-exact (dropped terms are sqrt(0*x)=0.0). NOT `_pairwise_rows`' changes-values path.
+- **#3 `ideal_state_bound`** (`72c0343`, GUARD-ONLY) — succs built once (was O(m^3)/peel) + iterative
+  longest-path (fixes RecursionError on a chain > recursion limit). Left `count_extensions`/`sample`'s
+  ideal-DP recursion untouched: making it iterative turns their fast catchable RecursionError on a
+  pathological tall poset into a multi-minute O(m^3) HANG — worse.
+- **#2 `feasibility._enumerate` + #9 `initialiser.moment_seed`** — MEASURED, left BASELINE (a finding).
+  #2 is bounded by `max_assignments=200k` (measured F=2..5 = 0.2..143ms, F>=6 caps out); realistic boxes
+  tiny; a pruned DFS needs byte-exact lex-order for a ~143ms already-capped worst case. #9 is a one-time
+  seed that (measured) doesn't escalate on realistic non-tied candidates (91ms); only a rare near-tie
+  climbs (1.5s once). Neither justifies a delicate byte-exact rewrite on a consumer path.
+
+Gate: procposets 362; PMN 201; SPM 54; cpm goldens green. Byte-exact gates: seeded/deterministic captures
+(sim 630 lines, distance 1488, _extensions 8901) all identical before/after (sha256).
