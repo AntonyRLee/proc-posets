@@ -17,6 +17,7 @@ of the model, plus a coarse-key generator for the inferred-groups demo:
 from __future__ import annotations
 
 import random
+from bisect import insort
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
@@ -88,18 +89,37 @@ def sample_timed_grouped_log(
     rng = random.Random(seed)
     rels = [tree_relations(t) for t in mix.trees]
     alphabet = sorted(mix.trees[0].elements())
+    # Hoist the per-component predecessor/successor indices out of one_timed
+    # (it was rebuilding preds on each of its G*n_g calls); both are rng-free, so
+    # the draw stream is untouched.  preds is transitively closed (tree_relations),
+    # so preds[x] & rem empty <=> x is minimal in rem, and indeg[x] = |remaining
+    # predecessors| lets the enabled frontier be maintained incrementally instead
+    # of rescanned O(|rem|*deg) every step.
+    preds_by_k = [_preds(alphabet, rel) for rel in rels]
+    succs_by_k = [
+        {x: [y for y in alphabet if x in preds[y]] for x in alphabet}
+        for preds in preds_by_k
+    ]
 
     def one_timed(k: int) -> Tuple[Tuple[str, ...], Tuple[float, ...]]:
-        rel, lam = rels[k], lams[k]
-        preds = _preds(alphabet, rel)  # {e: frozenset(predecessors)}
+        preds, succs, lam = preds_by_k[k], succs_by_k[k], lams[k]
         rem = set(alphabet)
+        indeg = {x: len(preds[x]) for x in alphabet}  # rem = full alphabet initially
+        enabled = sorted(x for x in alphabet if indeg[x] == 0)  # minimal elements
         trace: List[str] = []
         gaps: List[float] = []
         while rem:
-            enabled = sorted(x for x in rem if not (preds[x] & rem))
+            # enabled == sorted(x for x in rem if not (preds[x] & rem)) by invariant,
+            # so the rng draws below (len + choice) are byte-identical to the rescan.
             gaps.append(rng.expovariate(lam * len(enabled)))
-            trace.append(rng.choice(enabled))
-            rem.discard(trace[-1])
+            f = rng.choice(enabled)
+            trace.append(f)
+            rem.discard(f)
+            enabled.remove(f)
+            for y in succs[f]:  # f was minimal, so every descendant loses one pred
+                indeg[y] -= 1
+                if indeg[y] == 0:  # last predecessor of y just fired -> newly enabled
+                    insort(enabled, y)
         return tuple(trace), tuple(gaps)
 
     groups, z = [], []
