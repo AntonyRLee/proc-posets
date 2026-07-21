@@ -702,3 +702,32 @@ landed as documentation instead — recorded honestly below.
 **Phase 4 deferred:** none of the 9 items deferred. Consumer-side alias REMOVAL (migrating PMN/SPM
 off the old names, then dropping the aliases) is a per-consumer cut-over task, not done here — the
 aliases stay until then.
+
+### Finish-work — alias removal, override-globals removal, reproduce-check (2026-07-21)
+Post-refactor cleanup items 2 & 4 (of the review's remaining-work list); item 3 (port sim/cpm)
+deferred, flatten skipped.
+- **Item 2 — Phase-4 alias removal** (procposets `27b6744`; PMN `82e7af7` on `arl/alias-cutover`).
+  Dropped all 4 deprecation aliases: `rel_sp.sample_extension = sample_extension_tree` (+ its
+  re-exports in rel.py / __init__.py / decompose.py __all__), `diagnostics.report_vs_trivial`,
+  `viz/occn_vis.color_map`, and `Atom.noise` property + `make_atom(noise=)` kwarg (+ now-unused
+  `import warnings`; dropped the `test_noise_kernel_deprecation_shim` regression). The
+  `sample_extension` alias was load-bearing INTERNALLY (simulate.py, rel_classes.py,
+  test_np_posets.py → `sample_extension_tree`); the unrelated `poset.sample_extension(P,rng)` and
+  `PosetClass.sample_extension(self,…)` are NOT the alias and stay. PMN migrated: poset_mixture shim
+  + test_posets (sample_extension→_tree), 6 demos (report_vs_trivial→trivial_report), export_bridge +
+  tests (.noise→.noise_kernel, make_atom(noise=)→(noise_kernel=)), leaving the 3-arg method calls and
+  the already-new fit/Oracle(noise_kernel=) alone. SPM used none. Gate: procposets 358, PMN 201, SPM 54.
+- **Item 4 — string_diagram override globals removed** (`3e75156`). The 14 legacy module globals
+  (`STRAIGHT_SPINE`…`TYPE_LANES`) + `_style_from_globals()` bridge deleted; `render(style=None)` →
+  `DEFAULT_STYLE`. A read-only grep of the string-diagram-process-mining manuscript/tikz/figure code
+  found ZERO overrides anywhere (its figures use the pre-knob cpm/vis.py), so the bridge was dead.
+  `StringDiagramStyle` is the sole style API. Defaults byte-identical; suite 358. Item-4 flatten
+  dedup: scoped and SKIPPED (byte-exact but net-zero value; windowing is changes-values).
+- **Item 3 — port sim/cpm: DEFERRED past Phase 7** (owner decision). sim/cpm is the last independent
+  byte-exact ORACLE for the cospan/occn/viz stack (the `*_matches_cpm` goldens); porting it retires
+  that oracle, which Phase 7's speedup-gating needs. Do it as the final teardown, after Phase 7.
+- **Reproduce-check — ALL GREEN.** procposets==cpm confirmed both directions (16 procposets golden
+  cross-checks + sim's ed_chest_pain procposets-cross-check demos); cpm own suite **209 passed**;
+  PMN 201; SPM 54; procposets 358/13. The refactor reproduces end-to-end across all repos.
+
+**Next:** Phase 7 (efficiency stress map). The HOLD is lifted — everything reproduces.
