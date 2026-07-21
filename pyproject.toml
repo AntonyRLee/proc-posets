@@ -32,6 +32,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["procposets"]
+# The value-pinned golden corpus is dev-only; stray scratch must never ship.
+exclude = ["procposets/tests", "**/*.zip", "**/*.md"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"

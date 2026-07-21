@@ -10,4 +10,5 @@ if importlib.util.find_spec("networkx") is None:
         "test_cpm_occurrence.py",
         "test_cpm_trace_language.py",
         "test_cpm_splice.py",
+        "test_cpm_extract_cap.py",
     ]

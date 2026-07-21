@@ -201,13 +201,21 @@ def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
     ):
         surface_termini = False
     best: dict = {}
-    for a in g.activities:
+
+    def _bkey(bundle):  # deterministic order over a set of (label, type) bundles
+        return tuple(sorted((str(x), str(y)) for (x, y) in bundle))
+
+    # Iterate in a stable order so the representative Generator kept per CanonKey
+    # (best.setdefault keeps the first) is deterministic across runs; the CanonKey
+    # SET is order-invariant, so this changes which Generator object represents a
+    # key, never the set of keys the golden cross-check pins.
+    for a in sorted(g.activities):
         lab = g.lab(a)
         B = _side_bundles(g, a, forward=False)  # backward carries no gamma2 -> no post-proc
         F = _side_bundles(g, a, forward=True)
         F = _collapse_pure_terminus(F) if surface_termini else _strip_termini(F)
-        for P in B:
-            for S in F:
+        for P in sorted(B, key=_bkey):
+            for S in sorted(F, key=_bkey):
                 left = frozenset(Port(p, t, lab) for (p, t) in P)
                 right = frozenset(Port(lab, t, s) for (s, t) in S)
                 gen = Generator(lab, left, right)
