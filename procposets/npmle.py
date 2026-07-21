@@ -52,7 +52,8 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from .likelihood import Atom, GroupedLog, TimedGroupedLog
-from .oracle import Oracle, _log_mean_exp_rows
+from ._numerics import _log_mean_exp_rows
+from .oracle import Oracle
 
 
 def _moment_seed_atom(oracle: Oracle, log: GroupedLog, init_order) -> int:

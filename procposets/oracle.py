@@ -64,6 +64,7 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ._numerics import _log_mean_exp_rows
 from .likelihood import Atom, GroupedLog, TimedGroupedLog, make_atom
 from .rel import (
     IdealBudgetExceeded,
@@ -73,22 +74,6 @@ from .rel import (
     meet_closure,
     rel_from_trace,
 )
-
-
-def _log_mean_exp_rows(ratios: np.ndarray) -> np.ndarray:
-    """Per-row log((1/G) sum_g exp(ratios[., g])), with all-(-inf) rows
-    mapping to -inf instead of NaN."""
-    G = ratios.shape[1]
-    hi = ratios.max(axis=1)
-    out = np.full(ratios.shape[0], -np.inf)
-    ok = np.isfinite(hi)
-    if ok.any():
-        out[ok] = (
-            hi[ok]
-            + np.log(np.exp(ratios[ok] - hi[ok, None]).sum(axis=1))
-            - np.log(G)
-        )
-    return out
 
 
 class Oracle:
