@@ -635,3 +635,53 @@ spm/experiments **54 passed**, both unchanged.
 **Phase 2 fully landed except** the tree-block flatten skeleton
 (`matrix._block_sequence`/`discrete._block_items`) — its windowing part is
 `changes-values`, so it stays deferred (not a clean value-preserving dedup).
+
+### Phase 4 — API evolution (api-breaking, aliased), landed 2026-07-21 (suite: 358 passed, 13 skipped)
+Driven by a 10-agent read-only discovery across all 4 repos (consumer-breakage matrix +
+per-item plan). All landed behind deprecation aliases where a consumer touches the old
+name; end-gate re-run each consumer suite: PMN **201**, SPM **54**, unchanged. Two of the
+plan's "aliases" were found IMPOSSIBLE as functional merges (different input types) and
+landed as documentation instead — recorded honestly below.
+- **Item 5 — `in_L` spelling** (`6ecd8a0`) — `likelihood.trace_p`/`group_logf` param `inL`
+  → `in_L`, `oracle` local `inL_cache` → `in_L_cache`. All positional/internal (no kwarg
+  callers anywhere), numpy arrays never rendered → no value risk, no alias.
+- **Item 1 — e(P) (docs only)** (`6ecd8a0`) — the three spellings take three different input
+  types (`Poset` / `(elements,rel)` / `SPTree`), so a functional `count_extensions` alias is
+  impossible (immediate `TypeError`). Cross-referenced docstrings only; `count_linear_extensions`
+  + `extension_count` kept first-class (PMN imports both — no DeprecationWarning).
+- **Item 3 — series/parallel (docs only)** (`6ecd8a0`) — `then`/`par` build repeated-label
+  `Poset`s, `series`/`parallel` build distinct-label `SPTree`s, and the package-root
+  `series`/`parallel` are ALREADY the SPTree constructors, so a "canonical" alias is a footgun.
+  Decision (owner): docstring notes only, no new symbols.
+- **Item 6 — `CompositeDiagram.canonical_key` → `label_multiset_key`** (`3c03c17`) — dead in
+  procposets + both cut-over consumers (every `canonical_key(...)` call is the free function
+  `occurrence.canonical_key`). Rename resolves the 3-way ambiguity; `canon_key` /
+  `occurrence.canonical_key` unchanged. sim/cpm keeps its own copy (reconnect at its port).
+- **Item 8 — `report_vs_trivial` → `trivial_report`** (`8ceb3bf`) — module-level alias MANDATORY
+  (PMN demos import the old name via `poset_mixture.diagnostics`); surfaced `trivial_report` in
+  `_LAZY`/`__all__`; body byte-unchanged (format string byte-pinned in the PMN demo golden). The
+  break only surfaces in the CONSUMER suite.
+- **Item 2 — `sample_extension_tree`/`sample_extension_poset`** (`b60e305`) — the SPTree sampler
+  and the ideal-DP engine both named `sample_extension`; renamed by input type. `sample_extension
+  = sample_extension_tree` alias MANDATORY (PMN imports it and calls it directly). Byte-exact rng:
+  the public name stays wired to the TREE sampler (the two consume rng differently).
+- **Item 7 — `colour_map` + `viz/palette.py`** (`4272542`) — public `color_map` → `colour_map`
+  (+ alias); every colour hex single-sourced into `palette.py` with the three list palettes kept
+  SEPARATE (merging shifts modulo assignments). Gate: PYTHONHASHSEED=0 before/after over every
+  palette path incl the byte-pinned dag `render_dag` DOT (vs live cpm) — byte-identical.
+- **Item 4 — `noise_kernel`** (`de64d37`) — unified the spelling (Oracle/fit already used it);
+  Atom field `noise` → `noise_kernel` with a deprecating `.noise` read-property (keeps PMN's
+  `export_bridge.py` green) + `make_atom(noise=)` deprecated kwarg (TypeError if both). `describe()`
+  keeps the byte-pinned `noise=` token. PMN stays green untouched (no `filterwarnings=error` on any
+  `.noise` path; the demos error on warnings but never read it).
+- **Item 9 — `StringDiagramStyle`** (`842bbd2`) — the 14 mutable viz style globals → two frozen
+  dataclasses (`LayoutStyle`(4) + `DrawStyle`(10)) split along the layout/draw fault line, threaded
+  through the term-DSL closures + layout/draw functions; `render`/`catalogue` gain an append-only
+  `style=None` param that BRIDGES from the still-present globals (legacy override path byte-identical).
+  **This unblocks the deferred Phase-6 `viz/string_diagram.py` file-split** (layout/draw knobs no
+  longer cross-reference). Gate: before/after capture over every rendered artist (default output
+  byte-identical) + a NEW override test (goldens only cover defaults). File-split itself left to Phase 6.
+
+**Phase 4 deferred:** none of the 9 items deferred. Consumer-side alias REMOVAL (migrating PMN/SPM
+off the old names, then dropping the aliases) is a per-consumer cut-over task, not done here — the
+aliases stay until then.
