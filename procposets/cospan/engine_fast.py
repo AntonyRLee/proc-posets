@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from itertools import combinations, product
 
+from .._unionfind import UnionFind
 from .engine import GAMMA2, _collapse_pure_terminus, _strip_termini, _traverse
 from .lmgraph import LMGraph
 from .signature import Generator, Port, Signature
@@ -77,29 +78,15 @@ def _components(arc_opts: list) -> list:
     achievable full-side bundles are the Cartesian product of the components'.
     Over-coupling only ever costs enumeration, never correctness; *under*-coupling
     loses distinct CanonKeys (the untyped-choice bug this file fixes)."""
-    n = len(arc_opts)
-    parent = list(range(n))
-
-    def find(i: int) -> int:
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    def union(i: int, j: int) -> None:
-        parent[find(i)] = find(j)
-
+    uf = UnionFind(range(len(arc_opts)))
     by_type: dict = {}
     for i, opts in enumerate(arc_opts):
         for t in _reachable_types(opts):
             if t in by_type:
-                union(i, by_type[t])
+                uf.union(i, by_type[t])
             else:
                 by_type[t] = i
-    groups: dict = {}
-    for i in range(n):
-        groups.setdefault(find(i), []).append(i)
-    return [[arc_opts[i] for i in idxs] for idxs in groups.values()]
+    return [[arc_opts[i] for i in idxs] for idxs in uf.groups()]
 
 
 def _max_matching(reach: list) -> int:

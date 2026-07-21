@@ -56,6 +56,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 
+from ._unionfind import UnionFind
 from .poset import Poset
 
 
@@ -156,23 +157,14 @@ class Prime:
 # --- helpers ------------------------------------------------------------------
 
 def _components(nodes: list[int], edge) -> list[list[int]]:
-    """Connected components of the graph on `nodes` with predicate edge(u, v)."""
-    parent = {n: n for n in nodes}
-
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
+    """Connected components of the graph on `nodes` with predicate edge(u, v),
+    each a list in `nodes` order (the series-rank step relies on that order)."""
+    uf = UnionFind(nodes)
     for i, u in enumerate(nodes):
         for v in nodes[i + 1:]:
             if edge(u, v):
-                parent[find(u)] = find(v)
-    groups: dict[int, list[int]] = {}
-    for n in nodes:
-        groups.setdefault(find(n), []).append(n)
-    return list(groups.values())
+                uf.union(u, v)
+    return uf.groups()
 
 
 # --- decomposition ------------------------------------------------------------
