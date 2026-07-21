@@ -157,6 +157,18 @@ def test_touching_the_viz_layer_pulls_matplotlib():
     ), "the [viz] layer (string_diagram) must pull matplotlib"
 
 
+def test_string_diagram_layout_half_is_matplotlib_free():
+    # The point of the string_diagram file-split: the geometry half (viz/_layout
+    # -- term DSL + Layout/PlacedBox/Wire + _finish/_layout_composite) stays
+    # backend-free so a TikZ (or other) backend can reuse it without dragging in
+    # matplotlib.  The drawing half (string_diagram) still pulls matplotlib -- see
+    # the paired positive test above, which is this negative's non-vacuity witness.
+    pytest.importorskip("matplotlib")  # so the paired positive is meaningful
+    assert not _fresh_import_pulls(
+        "import procposets.viz._layout", "matplotlib"
+    ), "the string-diagram layout half (viz._layout) must stay matplotlib-free"
+
+
 def test_touching_the_pm4py_layer_pulls_pm4py():
     # Non-vacuity witness for the pm4py-free negative.  Importing the adapter
     # submodule runs adapters/__init__.py, which eagerly imports from_bpmn

@@ -589,15 +589,32 @@ now-live cospan goldens) and both ported consumer suites at the end (201 + 54, u
   re-export at the base keeps `procposets.rel` and the `poset_mixture.posets` shim
   unchanged; numpy-free-core guard still green. Dropped a dead `math.comb` import.
 
-**Phase 6 deferred — `viz/string_diagram.py` split (blocked on Phase 4):** the layout
-functions read 4 demo-overridable mutable style globals (`STRAIGHT_SPINE`, `TYPE_LANES`,
-`PORT_ORDER_KEY`, `ALIGN_BOUNDARY_STUBS`; 12 sites) and share geometry constants
-(`_BW`, `_BOX_PAD`) with the drawing side. A clean layout/drawing file-split needs the
-globals→config-dataclass conversion first — which the plan scopes as **Phase 4
-(api-breaking)**. Splitting before that is either a silent break of the documented
-override API (the viz goldens render with defaults, so they wouldn't catch it) or an
-untested semantic rewrite. Decision (2026-07-21): **defer to Phase 4**. The override API
-is currently unused by any on-disk consumer, but is documented + Phase-4-sequenced.
+**Phase 6 — `viz/string_diagram.py` split, LANDED 2026-07-21 (suite: 359 passed, 13 skipped):**
+was blocked on Phase-4 item 9 (the 14 style globals → `LayoutStyle`+`DrawStyle` dataclasses);
+that landed (`842bbd2`), so the layout functions are now fully parameterized by a
+`LayoutStyle` arg and read no globals. Split the 1229-LoC file into a new **matplotlib-free
+`viz/_layout.py`** (term DSL `Diagram`/`pick`/`D`/`gens`, the `Layout`/`PlacedBox`/`Wire`/`_Sub`
+datatypes, `LayoutStyle`, the layout fns `_box_sub`/`_seq`/`_par`/`_gen_delta`/`_ports`, and the
+two lowering paths `_finish`/`_layout_composite`/`_consumed_later`, plus the shared geometry
+constants `_BW`…`_RISER`) + the matplotlib drawing half that stays in `string_diagram.py`
+(`render`/`catalogue`/`_draw_wires`/bezier+crossing geometry/gid/`DrawStyle`/`StringDiagramStyle`/
+the 14 legacy override globals + `_style_from_globals` bridge). `string_diagram.py` re-exports
+every moved name so `string_diagram.NAME` resolves unchanged. **Verification (byte-exact on
+values):** every one of the 38 original top-level def/class bodies moved VERBATIM (AST source-
+segment equality, 0 changed); a layout-coordinate capture over 8 diagrams × 5 layout-knob
+variants + 2 composite DAG runs is byte-identical (same sha256) before/after; new permanent
+guard `test_string_diagram_layout_half_is_matplotlib_free` locks `viz._layout` backend-free
+(paired with the existing `…pulls_matplotlib` positive). Consumer surface audit (10→4-repo
+read-only fan-out): only external consumers are the procposets viz goldens (5 public names:
+`D`/`render`/`StringDiagramStyle`/`LayoutStyle`/`DrawStyle`) and the off-disk SDPM demo
+`recovery.py` (`catalogue`) — no private-helper use, no override sites anywhere. End-gate:
+PMN **201**, SPM **54**, unchanged.
+
+**Phase 6 note — override globals kept (Item-9 bridge, deliberate):** the 14 module globals
+(`STRAIGHT_SPINE`…`TYPE_LANES`) + `render(style=None)→_style_from_globals()` stay in
+`string_diagram.py`; the documented `sd.STRAIGHT_SPINE = True; render(...)` path is byte-identical.
+Removing them is a separate api-break (an off-disk manuscript/tikz repo is still ungreppable for
+overrides), not part of this value-preserving split.
 
 ### Phase 2 leftovers — the now-unblocked [graph]/[pm4py] dedups, landed 2026-07-21 (suite: 356 passed, 13 skipped)
 Previously deferred as "can't byte-verify standalone"; the Phase-6 golden-path fix
