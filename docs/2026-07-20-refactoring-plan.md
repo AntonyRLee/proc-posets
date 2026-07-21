@@ -511,3 +511,43 @@ before/after value capture **byte-identical** + full suite.
 - Long-tail type annotations on graph/viz internal helpers (bare `dict`/`tuple`/
   `frozenset` params) — lower value; the load-bearing ones already carry `# real-type`
   comments.
+
+### Phase 5 — layer-guard tests, landed 2026-07-21 (suite: 349 passed, 20 skipped)
+Test-only, `value-preserving` (no production code touched → no golden VALUE can move).
+Made the layering contract executable in **both directions** for all three heavy
+extras, extending `procposets/tests/test_lazy_numpy.py` from a numpy-only guard.
+- **Generalized the subprocess helper** — the inline `_numpy_imported(code)` became
+  `_fresh_import_pulls(setup, dep)`; the 3 existing numpy subprocess tests were
+  repointed to it with **byte-identical generated code** (`{dep!r}` → `'numpy'`), so
+  their pass/fail behaviour is unchanged; the in-process cache test is untouched. Two
+  single-source-of-truth constants `_STDLIB_CORE` / `_COSPAN_ALGEBRA` back both the
+  numpy and the graph/viz/pm4py negatives off the **same** module lists.
+- **3 new negatives** (assert *absence* → correct on a minimal install, no
+  `importorskip`): `test_stdlib_core_is_graph_and_viz_free` (the plan-named test:
+  networkx + matplotlib), `test_stdlib_core_is_pm4py_free`, and
+  `test_pure_cospan_algebra_is_graph_free` — the last is the non-obvious, drift-prone
+  one: the B0 algebra (engine/signature/compose/signature_compare) stays networkx-free
+  **even though** its direct siblings `cospan.occurrence`/`cospan.trace_language` each
+  carry a top-level `import networkx as nx`.
+- **3 new positives** (each `pytest.importorskip`s its extra → skip cleanly on a
+  minimal install) witnessing non-vacuity: networkx via `equivalence` **and**
+  `cospan.occurrence` (the latter pins the algebra guard), matplotlib via
+  `viz.string_diagram`, pm4py via `adapters.from_bpmn`.
+- **Empirically established** (serial, cgroup-capped, fresh-subprocess `sys.modules`
+  probes) the ground truth the tests encode: eager core (`import procposets`, the
+  stdlib set, the pure cospan algebra) pulls **none** of numpy/networkx/matplotlib/
+  pm4py; touching each layer pulls its dep. **Non-vacuity mutation-checked**: injecting
+  `import networkx` into the eager `__init__` made the graph/viz guard FAIL as designed
+  (then reverted). All new positives run (not skip) in this checkout — the 20 skips are
+  the unchanged [graph]/[pm4py] **cpm cross-check** goldens, orthogonal to these guards.
+- **Scope note:** deliberately did **not** add matplotlib-free / pm4py-free *cospan*
+  guards (no cospan-adjacent module pulls those, so they'd be vacuous; the stdlib-core
+  negatives already cover their absence). Helper kept `.strip() == "yes"` (not a
+  last-line compare) — traced-clean imports print no banner, so the simpler byte-exact
+  form is preferred.
+
+**Phase 5 remaining (from the plan, not done here):** the numpy-eager-guard already
+lived; the plan's second bullet (establish the golden-diff harness as the Phase 2/3
+gate) was operational throughout Phases 0–3 and needs no code. `equivalence.py`'s own
+eager top-level networkx import is *not* a core leak (it is not on the eager path) and
+its relocation to `cospan/` is Phase 6.
