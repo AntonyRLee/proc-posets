@@ -157,8 +157,8 @@ def tree_relations(tree: SPTree) -> Rel:
     return frozenset(rel)
 
 
-def sample_extension(tree: SPTree, rng) -> Tuple[str, ...]:
-    """Uniform linear extension of an SP poset.
+def sample_extension_tree(tree: SPTree, rng) -> Tuple[str, ...]:
+    """Uniform linear extension of an SP poset (the input-typed SPTree sampler).
 
     Correctness: extensions of a parallel composition biject with (extension
     of each child, interleaving pattern), all combinations equally likely, so
@@ -167,7 +167,7 @@ def sample_extension(tree: SPTree, rng) -> Tuple[str, ...]:
     """
     if tree.kind == "leaf":
         return (tree.label,)
-    parts = [list(sample_extension(c, rng)) for c in tree.children]
+    parts = [list(sample_extension_tree(c, rng)) for c in tree.children]
     if tree.kind == "series":
         out: List[str] = []
         for p in parts:
@@ -179,6 +179,11 @@ def sample_extension(tree: SPTree, rng) -> Tuple[str, ...]:
     rng.shuffle(labels)
     its = [iter(p) for p in parts]
     return tuple(next(its[i]) for i in labels)
+
+
+# Back-compat alias for the historical untyped public name (the exported
+# ``procposets.sample_extension`` binds the SPTree sampler; consumers import it).
+sample_extension = sample_extension_tree
 
 
 # ---------------------------------------------------------------------------

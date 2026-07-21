@@ -117,8 +117,8 @@ def count_extensions(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> int
     return rec(frozenset(elements))
 
 
-def sample_extension(elements, pairs, rng, max_states: int = MAX_IDEAL_STATES) -> Tuple:
-    """Uniform linear extension of an arbitrary partial order.
+def sample_extension_poset(elements, pairs, rng, max_states: int = MAX_IDEAL_STATES) -> Tuple:
+    """Uniform linear extension of an arbitrary partial order (the ideal-DP engine).
 
     Sequential sampling with the ideal-lattice DP as the exact proposal:
     the first element is x (minimal) with probability e(P - x) / e(P), which

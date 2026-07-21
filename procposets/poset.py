@@ -174,7 +174,7 @@ def from_dag(edges, nodes=()) -> Poset:
 
 from ._extensions import IdealBudgetExceeded  # noqa: E402,F401  (re-export)
 from ._extensions import count_extensions as _count
-from ._extensions import sample_extension as _sample
+from ._extensions import sample_extension_poset as _sample
 
 
 def count_extensions(P: "Poset") -> int:

@@ -130,7 +130,7 @@ def count_linear_extensions(elements, rel) -> int:
 
 
 def sample_linear_extension(elements, rel, rng):
-    return _ext.sample_extension(elements, rel, rng, max_states=MAX_IDEAL_STATES)
+    return _ext.sample_extension_poset(elements, rel, rng, max_states=MAX_IDEAL_STATES)
 
 
 def _check_ideal_budget(elements, rel) -> None:
@@ -255,6 +255,7 @@ from .rel_sp import (  # noqa: E402
     is_sp,
     parallel,
     sample_extension,
+    sample_extension_tree,
     series,
     tree_relations,
 )
