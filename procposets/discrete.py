@@ -41,7 +41,6 @@ from .matrix import END, START, build
 from .moddecomp import Parallel, Prime, Series, decompose
 from .poset import Poset
 from .poset import count_extensions
-from .traces import linear_extensions
 
 # --------------------------------------------------------------------------- Kemeny family
 

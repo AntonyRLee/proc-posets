@@ -112,25 +112,21 @@ def _activity_pomsets(sig: Signature, max_traces: int = 5000) -> frozenset:
     gens = list(sig.generators)
     starts = [g for g in gens if not g.left]
     results: set = set()
-    stack: list[tuple[frozenset, tuple, frozenset]] = []
+    stack: list[tuple[frozenset, frozenset]] = []
     for s in starts:
-        stack.append((frozenset(s.right), (s,), frozenset()))
+        stack.append((frozenset(s.right), frozenset()))
     while stack and len(results) < max_traces:
-        frontier, chain, edges = stack.pop()
+        frontier, edges = stack.pop()
         if not frontier:  # all ports consumed -> a complete scenario
             results.add(edges)
             continue
-        progressed = False
         for g in gens:
             if g.left and g.left <= frontier:
                 new_front = (frontier - g.left) | g.right
                 new_edges = edges | frozenset(
                     (p.src, g.label) for p in g.left
                 ) | frozenset((g.label, p.tgt) for p in g.right)
-                stack.append((new_front, chain + (g,), new_edges))
-                progressed = True
-        if not progressed and not frontier:
-            results.add(edges)
+                stack.append((new_front, new_edges))
     return frozenset(results)
 
 

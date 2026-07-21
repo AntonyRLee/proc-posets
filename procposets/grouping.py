@@ -17,7 +17,7 @@ fitted eta reports the blocking quality back to you.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable, Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Tuple
 
 
 def group_by_key(

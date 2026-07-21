@@ -219,17 +219,6 @@ def _tarjan_scc(graph: _Graph) -> dict[State, int]:
     return scc_of
 
 
-def _nontrivial_sccs(graph: _Graph, scc_of: dict[State, int]) -> set[int]:
-    """SCC ids that actually contain a cycle (size>1, or a self-loop)."""
-    size: Counter = Counter(scc_of.values())
-    nontrivial = {sid for sid, n in size.items() if n > 1}
-    for s, edges in graph.succ.items():
-        for _, ns in edges:
-            if ns == s:
-                nontrivial.add(scc_of[s])
-    return nontrivial
-
-
 def extract_classes(
     sig: Signature, *, max_frontiers: int = 200_000, max_pomsets_per_state: int = 512,
     one_origin: bool = False,
