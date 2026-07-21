@@ -180,6 +180,15 @@ def to_event_dag(
         for src in producers:
             wires.setdefault((src, OUT), []).append(p.typ)
 
+    return _assemble_event_dag(wires, labels, strip_prefixes, nm.name)
+
+
+def _assemble_event_dag(wires: dict, labels: dict, strip_prefixes: tuple,
+                        name: str) -> EventDag:
+    """Build the ``EventDag`` from the replayed ``wires`` (typed arcs per ordered
+    node pair) and ``labels``: one typed edge per pair (dropping bare
+    anchor->anchor and boundary-internal self-loop wires), reattach any bare
+    source/sink to the single γ1/γ2 boundary, then drop unused sentinels."""
     g = nx.DiGraph()
     for sentinel in (IN, OUT, GAMMA1, GAMMA2):
         g.add_node(sentinel, label=sentinel)
@@ -215,7 +224,7 @@ def to_event_dag(
         if g.degree(b) == 0:
             g.remove_node(b)
 
-    return EventDag(graph=g, name=nm.name)
+    return EventDag(graph=g, name=name)
 
 
 def loop_cycle_dag(nm: NamedMorphism, by_name: dict[str, NamedMorphism]) -> EventDag:
