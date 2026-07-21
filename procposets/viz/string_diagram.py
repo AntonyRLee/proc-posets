@@ -88,49 +88,12 @@ def _darken(colour, factor: float = 0.7):
     return (r * factor, g * factor, b * factor)
 
 
-# --- style knobs (module-level so a demo can override before rendering) ------
-STRAIGHT_SPINE = False  # True: `;` chains stay on one horizontal spine (no
-# waterfall drift) and `⊗` stacks are centred on it
-BOUNDARY_LINESTYLE = "--"  # linestyle for dangling boundary stubs
-INTERNAL_WIRE_LINESTYLE = "-"  # box-to-box wires; presentation renders may dash
-# these to expose the gluing seams between composed generators
-OPEN_END_MARKERS = True  # circle marker on each dangling boundary tip
-BOX_FACECOLOR = "white"  # default box face ("none" -> see-through boxes)
-BOX_FACE_OVERRIDES: dict[str, str] = {}  # box label -> facecolor (e.g. to
-# flag a compactified-loop power box)
-BOX_LABEL_MAP: dict[str, str] = {}  # box label -> display label (e.g. a
-# 4-char code; pair with a legend mapping code -> activity)
-BOX_LABEL_FONTSIZE: float = 9  # box/result label size; presentation renders bump this
-# for legibility once figures are scaled down into slides / scrollytelling
-PORT_ORDER_KEY = None  # optional callable Port -> sort key controlling the
-# bottom-to-top port order on a box edge; when a demo's wires have a known
-# vertical layout (e.g. lab branches above the spine, img below), matching
-# the port order to it removes avoidable wire crossings
-ALIGN_BOUNDARY_STUBS = False  # True: all dangling boundary stubs on a side
-# extend to one common x (the diagram's outermost open end) instead of a
-# fixed per-box margin -- open legs then start/end flush left/right
-SVG_GIDS = False  # stamp semantic SVG ids (gid) on every artist:
-# box-<activity>/boxlabel-<activity>, node-<result>-r<round>/nodelabel-...,
-# block-<fN>/blocklabel-<fN>, wire-<type>-s<n>. Roles come from GID_ROLES;
-# round numbers from the x-rank of result columns (+ GID_ROUND_OFFSET).
-# Enable only for single-diagram figures -- ids must be unique per SVG.
-GID_ROLES: dict[str, str] = {}  # box label -> 'activity'|'result'|'block'|'boundary'
-GID_ROUND_OFFSET = 0  # added to computed round numbers (multi-call figures)
-TYPE_LANES: dict[str | None, float] | None = None  # object type -> fixed
-# wire lane (y offset). When set, every port sits exactly on its type's lane
-# and boxes centre over their ports, so all wires run straight and
-# horizontal. Sound only while no generator carries two same-typed ports on
-# one edge (duplicates are nudged apart by _PS as a fallback).
-
-
 # --- style config dataclasses ----------------------------------------------
-# The 14 knobs above, grouped into two frozen dataclasses split along the exact
+# The style knobs, grouped into two frozen dataclasses split along the exact
 # layout/draw fault line: the LAYOUT knobs (:class:`LayoutStyle`, in the
 # matplotlib-free ._layout) are read only by the geometry functions, the DRAW
-# knobs below only by this matplotlib backend. render(style=None) BUILDS a style
-# from the module globals above (the bridge), so the legacy "sd.STRAIGHT_SPINE =
-# True; render(...)" override path stays byte-identical; pass
-# style=StringDiagramStyle(...) for the clean API.
+# knobs below only by this matplotlib backend. Pass style=StringDiagramStyle(...)
+# to override the defaults; render(style=None) uses DEFAULT_STYLE.
 @dataclass(frozen=True)
 class DrawStyle:
     boundary_linestyle: str = "--"
@@ -152,30 +115,6 @@ class StringDiagramStyle:
 
 
 DEFAULT_STYLE = StringDiagramStyle()
-
-
-def _style_from_globals() -> StringDiagramStyle:
-    """Build a style from the legacy module-level knobs (the render(style=None) bridge)."""
-    return StringDiagramStyle(
-        layout=LayoutStyle(
-            straight_spine=STRAIGHT_SPINE,
-            port_order_key=PORT_ORDER_KEY,
-            align_boundary_stubs=ALIGN_BOUNDARY_STUBS,
-            type_lanes=TYPE_LANES,
-        ),
-        draw=DrawStyle(
-            boundary_linestyle=BOUNDARY_LINESTYLE,
-            internal_wire_linestyle=INTERNAL_WIRE_LINESTYLE,
-            open_end_markers=OPEN_END_MARKERS,
-            box_facecolor=BOX_FACECOLOR,
-            box_face_overrides=BOX_FACE_OVERRIDES,
-            box_label_map=BOX_LABEL_MAP,
-            box_label_fontsize=BOX_LABEL_FONTSIZE,
-            svg_gids=SVG_GIDS,
-            gid_roles=GID_ROLES,
-            gid_round_offset=GID_ROUND_OFFSET,
-        ),
-    )
 
 
 # --- bezier wire rendering + braid-style crossing breaks --------------------
@@ -410,11 +349,10 @@ def render(
     custom text instead of its triple -- for a symbolic multiplicity (e.g.
     ``"2u"``) a single representative port stands in for an unbounded number
     of same-typed wires that can't literally be drawn.  Returns the
-    ``style`` overrides the layout/draw knobs; ``None`` (default) builds one from the
-    module-level globals so the legacy ``sd.STRAIGHT_SPINE = True; render(...)`` path
-    stays byte-identical.  Returns the :class:`~matplotlib.figure.Figure`."""
+    ``style`` overrides the layout/draw knobs; ``None`` (default) uses
+    :data:`DEFAULT_STYLE`.  Returns the :class:`~matplotlib.figure.Figure`."""
     if style is None:
-        style = _style_from_globals()
+        style = DEFAULT_STYLE
     lay, ds = style.layout, style.draw
     if isinstance(obj, Diagram):
         sub = obj._sub(lay)
