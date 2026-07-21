@@ -26,11 +26,10 @@ from ..distance import _augment, smd
 from ..matrix import END, START, build
 from ..poset import Poset
 
-# palette / geometry from cpm/vis.py
-_ALIZARIN = "#D2292D"
-_COTTON = "#1761B0"     # activities / wires
-_BLACK = "#282828"
-_BOUNDARY = "#bbbbbb"   # gamma1 / gamma2 boundary points
+# palette (centralized in viz/palette.py) / geometry from cpm/vis.py
+from .palette import BOUNDARY_GREY as _BOUNDARY  # gamma1 / gamma2 boundary points
+from .palette import COTTON_BLUE as _COTTON  # activities / wires
+from .palette import OLD_BLACK as _BLACK
 _BW, _BH = 1.35, 0.66
 
 

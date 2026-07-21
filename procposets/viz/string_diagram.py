@@ -106,25 +106,11 @@ _GAP = 0.11  # Euclidean radius (data units) of the disk erased from the
 _TRIM = 0.06  # ignore crossings within this fraction of either curve's ends
 
 # --- type -> colour ---------------------------------------------------------
-# Red/black/blue variants from the "Red, Black & Blue" palette
-# (color-hex.com/color-palette/26562): one variant of each picked for the
-# loop-family ports; _GREY is an unused spare, not from that palette.
-_ALIZARIN = "#D2292D"  # red variant
-_OLD_BLACK = "#282828"  # black variant
-_COTTON_BLUE = "#1761B0"  # blue variant
-_GREY = "#9E9E9E"  # unused spare
-
-_PALETTE: dict[str | None, str] = {
-    "pat": "#1f77b4",  # patient  -- blue
-    "lab": "#2ca02c",  # lab      -- green
-    "img": "#ff7f0e",  # imaging  -- orange
-    "bed": "#d62728",  # bed      -- red
-    "alpha": _ALIZARIN,  # loop-family alpha -- red
-    "beta": _COTTON_BLUE,  # loop-family beta  -- blue
-    "gamma": _OLD_BLACK,  # loop-family gamma -- black
-    None: "#888888",  # untyped  -- grey
-}
-_FALLBACK = ["#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22"]
+# Palette centralized in viz/palette.py (verbatim hexes; the loop-family ports use
+# the "Red, Black & Blue" variants). ``_colour_map`` copies ``_PALETTE`` before adding
+# fallbacks, so the shared dict is never mutated.
+from .palette import STRING_DIAGRAM_TYPE_COLOURS as _PALETTE  # noqa: E402
+from .palette import STRING_DIAGRAM_FALLBACK as _FALLBACK  # noqa: E402
 
 
 def _colour_map(types: set[str | None]) -> dict[str | None, str]:

@@ -23,10 +23,9 @@ from ..cospan.class_extraction import ExtractionResult, NamedMorphism, _fire, _t
 from ..cospan.dag_diff import DagDiffReport, closing_spine
 from ..cospan.morphism_schema import _expand, _frames
 from ..cospan.occurrence import IN, OUT, EventDag, anchor_types, canonical_key, history_keys, to_event_dag
-
-# the all-models combo is always green; other combos draw from _PALETTE below
-_ALL = "#2ca02c"      # green: every model agrees
-_BOUNDARY = "#bbbbbb"  # grey: the IN/OUT roots
+from .palette import ALL_MODELS_GREEN as _ALL  # green: every model agrees
+from .palette import BOUNDARY_GREY as _BOUNDARY  # grey: the IN/OUT roots
+from .palette import SPLICE_BROWN as _SPLICE  # dashed loop/splice edge
 
 
 def _esc(s: str) -> str:
@@ -98,7 +97,7 @@ def render_dag(dag: EventDag, *, rankdir: str = "TB") -> str:
 # are told apart, not both lumped as an ambiguous "subset"). The all-models
 # combo is always green; the rest draw from this palette in a deterministic
 # order, so the legend names exactly which models each colour means.
-_PALETTE = ["#1f77b4", "#ff7f0e", "#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22", "#d62728"]
+from .palette import DAG_COMBO_PALETTE as _PALETTE  # noqa: E402
 
 
 def _combo_order_key(combo: frozenset, full: frozenset):
@@ -365,7 +364,7 @@ def render_splice_catalogue(rep, *, title: str = "", collapse: bool = True) -> s
             mark = "↺ " + ",".join(sorted({cycle_of.get(lid, lid) for lid in s.loop_ids}))
             lines.append(
                 f'    "{nid(node)}" -> "{nid(node)}" '
-                f'[style=dashed, color="#8c564b", fontcolor="#8c564b", '
+                f'[style=dashed, color="{_SPLICE}", fontcolor="{_SPLICE}", '
                 f'label="{_esc(mark)}", fontsize=9];'
             )
         lines.append("  }")
