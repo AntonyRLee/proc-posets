@@ -551,3 +551,48 @@ lived; the plan's second bullet (establish the golden-diff harness as the Phase 
 gate) was operational throughout Phases 0–3 and needs no code. `equivalence.py`'s own
 eager top-level networkx import is *not* a core leak (it is not on the eager path) and
 its relocation to `cospan/` is Phase 6.
+
+### Consumer-repo reality check, 2026-07-21 (corrects the "not checked out" framing)
+All three consumer repos are **on disk** and two are **already cut over** to the
+editable `../procposets` path dep, so procposets changes hit them immediately:
+- `poset-mixture-npmle` (`main`) — ported; `poset_mixture/__init__` is a re-export
+  shim, originals deleted. Suite **201 passed** against current procposets.
+- `stochastic_process_mining/experiments` (`arl/main`) — ported; `spm/__init__` shim.
+  Suite **54 passed** (2 files fail collection on a missing `demo/11_synthetic_fleet/
+  signature_lift.py` — a pre-existing spm gap, unrelated to procposets).
+- `string-diagram-process-mining/sim` (`arl/sosym`) — **NOT** ported; still runs its
+  own `cpm/` copy (the source-of-truth for the [graph]/[pm4py] originals).
+
+Consequence for the goldens: the repo was renamed `-DIAGRAM-…-v2/sim` →
+`string-diagram-process-mining/sim`, so the cospan/unroll/viz goldens were skipping on
+a **stale path**, not missing code (`c440f4c` repoints them → +7 byte-exact cross-checks
+now green). The other 13 skips are estimation/poset goldens whose originals were
+**deleted** from the two cut-over repos — vestigial (their "not checked out" messages
+are now misleading; a future cleanup could drop or re-message them).
+
+### Phase 6 — structure & module moves, landed 2026-07-21 (suite: 356 passed, 13 skipped)
+Value-preserving, each behind a re-export shim; gated on the procposets suite (incl. the
+now-live cospan goldens) and both ported consumer suites at the end (201 + 54, unchanged).
+- **Golden path fix** (`c440f4c`) — see above; test-only, un-skipped 7 cross-checks.
+- **`equivalence.py` → `cospan/equivalence.py`** (`10b028e`) — networkx-backed,
+  cospan.signature-dependent B1 module; thin shim at `procposets.equivalence` keeps the
+  public path. cpm.equivalence golden cross-check now green.
+- **`_log_mean_exp_rows` → `procposets/_numerics.py`** (`10b028e`) — shared numpy
+  primitive out of `oracle`; imported by both `oracle` and `npmle` (both re-import it so
+  `oracle._log_mean_exp_rows` / `npmle._log_mean_exp_rows` still resolve).
+- **`from_petri` re-export** (`10b028e`) — `lmgraph_from_petri`/`_nets` surfaced from
+  `adapters/__init__` so all three inbound `lmgraph_from_*` share one namespace.
+- **`rel.py` split** (`f148d02`) — byte-exact line-slice into `rel.py` (relation algebra
+  + ideal-DP) + `rel_sp.py` (SP-tree view) + `rel_classes.py` (hypothesis classes);
+  re-export at the base keeps `procposets.rel` and the `poset_mixture.posets` shim
+  unchanged; numpy-free-core guard still green. Dropped a dead `math.comb` import.
+
+**Phase 6 deferred — `viz/string_diagram.py` split (blocked on Phase 4):** the layout
+functions read 4 demo-overridable mutable style globals (`STRAIGHT_SPINE`, `TYPE_LANES`,
+`PORT_ORDER_KEY`, `ALIGN_BOUNDARY_STUBS`; 12 sites) and share geometry constants
+(`_BW`, `_BOX_PAD`) with the drawing side. A clean layout/drawing file-split needs the
+globals→config-dataclass conversion first — which the plan scopes as **Phase 4
+(api-breaking)**. Splitting before that is either a silent break of the documented
+override API (the viz goldens render with defaults, so they wouldn't catch it) or an
+untested semantic rewrite. Decision (2026-07-21): **defer to Phase 4**. The override API
+is currently unused by any on-disk consumer, but is documented + Phase-4-sequenced.
