@@ -440,3 +440,31 @@ membership-matching names — **bodies byte-identical (value-preserving)**:
   `cospan/_boundary.py` (plan §2.6) — a bigger surface across byte-exact-critical
   modules whose cpm cross-checks skip in this checkout; do it with the consumer
   repos present for full gating.
+
+### Phase 1 (cont.) — Model alias, landed 2026-07-21 (suite: 343 passed, 20 skipped)
+`Model = list[tuple[Poset, float]]` was redefined 4× verbatim and weakened to
+`Model = list` in `traces`. Single-homed in `poset.py`, imported everywhere;
+dropped the now-unused `Poset` import from `distance`/`outbound`. Annotation-only
+→ value-preserving. Commit `b081eb3`.
+
+### Phase 2 — deduplication (gate-able parts), landed 2026-07-21 (suite: 343 passed, 20 skipped)
+Each change gated two ways where float-sensitive: fixed-seed (`PYTHONHASHSEED=0`)
+before/after `repr()` capture **byte-identical** + full suite green.
+- **Bhattacharyya-angle kernel** (`c779f7c`) — 6 open-coded copies → 3 helpers
+  (`_clamp01`, `_row_angle`, `_bhattacharyya_angle`) in `distance.py`; repointed
+  `smd_rows`, `bhattacharyya_angle`, `discrete._matrix_angle`, `discrete.order_angle`,
+  `traces.trace_bhattacharyya`, and the clamp in `_pairwise_rows`. **`_pairwise_rows`
+  keeps its distinct smaller-row summation order — excluded on purpose** (folding it
+  in is `changes-values`). Capture: 23/23 result lines identical.
+- **preds routing** (`2667dfe`) — `traces.linear_extensions` + `simulate.one_timed`
+  now use `_extensions.preds`. Capture: linear_extensions ×4 posets + timed sampler
+  ×3 seeds byte-identical. **Remaining:** `likelihood._k_vectors`; `rel._ideals`/
+  `_filters` (also want the `_closed_sets` down/up merge) — follow-up.
+- **feasibility scaffold** (`90d9e90`) — `solve`/`all_solutions`/`ranges` triplicated
+  enumeration → one private `_enumerate` generator; unified the `FeasibilityTooLarge`
+  message (untested text). `test_cpm_feasibility` 6/6.
+
+**Phase 2 deferred (need consumer-repo gating or bigger surface):** OCCN `_lift.py`
+helpers; `cospan/_boundary.py` constants; union-find primitive; adapter
+build/validate wrappers; rel canonical-key + `_ideals`/`_filters` merge; tree-block
+flatten skeleton.
