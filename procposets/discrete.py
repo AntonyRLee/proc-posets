@@ -307,6 +307,23 @@ def _normalise_refine(refine):
     return kinds
 
 
+def _refined_step(kind, atoms, sym, ctx, total, k, kinds):
+    """One block item's transition, as ``(targets, new_frontier)``: an atomic
+    window step (all mass to one '|'-joined last-<=k-blocks state) or a uniform
+    fan-out over the context-typed atoms.  ``targets[state]`` is the per-source
+    fraction; ``new_frontier[state]`` is that fraction times the incoming mass."""
+    prefix = ctx[-(k - 1):] if k > 1 else []
+    if kind == "block" or kind not in kinds:       # atomic step: standard window state
+        win = "|".join((ctx + [sym])[-k:])
+        return {win: 1.0}, {win: total}            # each source sends all its mass
+    atoms = atoms or ["<empty>"]                   # fan-out over context-typed atoms
+    targets: dict = {}
+    for a in atoms:                                # multiset-safe: duplicates accumulate
+        st = "|".join(prefix + [a])
+        targets[st] = targets.get(st, 0.0) + 1.0 / len(atoms)
+    return targets, {st: f * total for st, f in targets.items()}
+
+
 def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True,
                    recursive: bool = False, chain_k=2):
     """Block matrix in which blocks of the selected `kinds` fan out over their atoms.
@@ -339,18 +356,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
         ctx: list = []                                     # block symbols emitted so far
         for kind, atoms, sym in _block_items(decompose(P), recursive, chain_k):
             total = sum(frontier.values())
-            prefix = ctx[-(k - 1):] if k > 1 else []
-            if kind == "block" or kind not in kinds:       # atomic step: standard window state
-                win = "|".join((ctx + [sym])[-k:])
-                targets = {win: 1.0}                       # each source sends all its mass
-                new_frontier = {win: total}
-            else:                                          # fan-out over context-typed atoms
-                atoms = atoms or ["<empty>"]
-                targets = {}
-                for a in atoms:                            # multiset-safe: duplicates accumulate
-                    st = "|".join(prefix + [a])
-                    targets[st] = targets.get(st, 0.0) + 1.0 / len(atoms)
-                new_frontier = {st: f * total for st, f in targets.items()}
+            targets, new_frontier = _refined_step(kind, atoms, sym, ctx, total, k, kinds)
             hit = set(new_frontier) & visited
             if hit and strict:
                 raise ValueError(
