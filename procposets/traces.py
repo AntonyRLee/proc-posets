@@ -9,15 +9,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ._extensions import preds as _preds
 from .distance import _bhattacharyya_angle
 from .poset import Model, Poset
 
 
 def linear_extensions(P: Poset) -> list[tuple[str, ...]]:
     """All linear extensions of P as label words (distinct-label posets: one word each)."""
-    preds: dict[int, set[int]] = {e: set() for e in P.elements}
-    for (u, v) in P.less:
-        preds[v].add(u)
+    preds = _preds(P.elements, P.less)  # {e: frozenset(predecessors)}
     out: list[tuple[str, ...]] = []
 
     def rec(remaining: set[int], placed: set[int], acc: list[int]):

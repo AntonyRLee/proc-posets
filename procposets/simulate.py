@@ -20,6 +20,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
+from ._extensions import preds as _preds
 from .rel import SPTree, sample_extension
 
 
@@ -84,7 +85,7 @@ def sample_timed_grouped_log(
 
     def one_timed(k: int) -> Tuple[Tuple[str, ...], Tuple[float, ...]]:
         rel, lam = rels[k], lams[k]
-        preds = {e: {a for (a, b) in rel if b == e} for e in alphabet}
+        preds = _preds(alphabet, rel)  # {e: frozenset(predecessors)}
         rem = set(alphabet)
         trace: List[str] = []
         gaps: List[float] = []
