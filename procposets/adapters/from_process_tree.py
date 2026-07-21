@@ -31,6 +31,7 @@ from itertools import count
 
 from pm4py.objects.process_tree.obj import Operator
 
+from ..cospan._lmgraph_build import _assemble, _assemble_single, _type_prefix
 from ..cospan.lmgraph import Kind, LMGraph
 
 
@@ -41,7 +42,7 @@ def add_process_tree(g: LMGraph, tree, otype: str | None) -> tuple[str, str]:
     the whole tree's flow fragment (rarely needed by callers; the boundary is
     otherwise inferred structurally, as in :mod:`from_petri`).
     """
-    pre = f"{otype}__" if otype is not None else ""
+    pre = _type_prefix(otype)
     counter = count()
 
     def fresh(kind: Kind, tag: str) -> str:
@@ -109,16 +110,9 @@ def add_process_tree(g: LMGraph, tree, otype: str | None) -> tuple[str, str]:
 
 def lmgraph_from_process_trees(trees_by_type: dict) -> LMGraph:
     """Build one typed object-centric LM-graph from ``{otype: ProcessTree}``."""
-    g = LMGraph()
-    for otype, tree in trees_by_type.items():
-        add_process_tree(g, tree, otype)
-    g.validate()
-    return g
+    return _assemble(add_process_tree, trees_by_type)
 
 
 def lmgraph_from_process_tree(tree, otype: str | None = None) -> LMGraph:
     """Single (optionally untyped) ProcessTree -> LM-graph."""
-    g = LMGraph()
-    add_process_tree(g, tree, otype)
-    g.validate()
-    return g
+    return _assemble_single(add_process_tree, tree, otype)

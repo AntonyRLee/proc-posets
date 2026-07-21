@@ -34,6 +34,7 @@ from __future__ import annotations
 
 from pm4py.objects.bpmn.obj import BPMN
 
+from ..cospan._lmgraph_build import _assemble, _assemble_single, _type_prefix
 from ..cospan.lmgraph import Kind, LMGraph
 
 _GATEWAY_KIND = {
@@ -50,7 +51,7 @@ def add_bpmn(g: LMGraph, bpmn, otype: str | None) -> None:
     ``otype``. Gateways are namespaced by ``otype``; activities (tasks and
     events) are shared by label, as in :mod:`from_petri`.
     """
-    pre = f"{otype}__" if otype is not None else ""
+    pre = _type_prefix(otype)
 
     def gateway_kind(n) -> Kind | None:
         for cls, kind in _GATEWAY_KIND.items():
@@ -88,16 +89,9 @@ def add_bpmn(g: LMGraph, bpmn, otype: str | None) -> None:
 
 def lmgraph_from_bpmn_diagrams(diagrams_by_type: dict) -> LMGraph:
     """Build one typed object-centric LM-graph from ``{otype: BPMNDiagram}``."""
-    g = LMGraph()
-    for otype, bpmn in diagrams_by_type.items():
-        add_bpmn(g, bpmn, otype)
-    g.validate()
-    return g
+    return _assemble(add_bpmn, diagrams_by_type)
 
 
 def lmgraph_from_bpmn(bpmn, otype: str | None = None) -> LMGraph:
     """Single (optionally untyped) BPMNDiagram -> LM-graph."""
-    g = LMGraph()
-    add_bpmn(g, bpmn, otype)
-    g.validate()
-    return g
+    return _assemble_single(add_bpmn, bpmn, otype)
