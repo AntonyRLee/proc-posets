@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import math
 from itertools import combinations
+from typing import Literal
 
 from .distance import _augment, _row_angle
 from .matrix import END, START, build
@@ -136,7 +137,8 @@ def _matrix_angle(a1, a2, states):
     return 2.0 * math.sqrt(total), per
 
 
-def block_angle(m1, m2, weighting="uniform_variant", context_depth=1):
+def block_angle(m1, m2, weighting: Literal["uniform_variant", "support", "lincount"] = "uniform_variant",
+                context_depth: int = 1):
     """Block-SMD between two models under one of the three weightings (option 1/2/3).
 
     For 'support' the row frequencies are discarded: each row is made uniform over its support on the

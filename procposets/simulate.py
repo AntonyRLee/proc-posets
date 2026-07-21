@@ -26,13 +26,19 @@ from .rel import SPTree, sample_extension
 
 @dataclass
 class TrueMixture:
+    """A ground-truth mixture of SP posets -- ``trees`` weighted by ``weights`` --
+    the generative model the simulators sample from."""
+
     trees: List[SPTree]
     weights: List[float]
 
     def sample_component(self, rng: random.Random) -> int:
+        """Draw a component index ``k`` with probability ``weights[k]``."""
         return rng.choices(range(len(self.trees)), weights=self.weights)[0]
 
     def sample_trace(self, k: int, rng: random.Random, eps_sim: float = 0.0):
+        """A uniform linear extension of component ``k`` as a label word, with an
+        optional ``eps_sim`` chance of one adjacent transposition (recording noise)."""
         t = list(sample_extension(self.trees[k], rng))
         if eps_sim > 0 and rng.random() < eps_sim and len(t) > 1:
             i = rng.randrange(len(t) - 1)

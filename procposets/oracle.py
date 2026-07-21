@@ -92,6 +92,11 @@ def _log_mean_exp_rows(ratios: np.ndarray) -> np.ndarray:
 
 
 class Oracle:
+    """The Frank-Wolfe pricing oracle: assemble the candidate-atom set (the regime
+    is chosen automatically -- enumeration / meet-closure / heuristic lattice, see
+    the module docstring) and price each atom's likelihood-gradient score against
+    the current mixture density (:meth:`price`)."""
+
     def __init__(
         self,
         log: GroupedLog,

@@ -32,6 +32,8 @@ def linear_extensions(P: Poset) -> list[tuple[str, ...]]:
 
 
 def trace_distribution(model: Model) -> dict[tuple[str, ...], float]:
+    """The model's distribution over label words: each variant spreads its weight
+    uniformly over its linear extensions (Assumption 3), summed and normalised."""
     dist: dict[tuple[str, ...], float] = defaultdict(float)
     tot = 0.0
     for P, w in model:
@@ -43,4 +45,7 @@ def trace_distribution(model: Model) -> dict[tuple[str, ...], float]:
 
 
 def trace_bhattacharyya(model1: Model, model2: Model) -> float:
+    """Result-1 Bhattacharyya angle between two models' trace distributions -- the
+    trace/behaviour-based comparison (blind to genuine concurrency vs a coin-flip
+    between orders)."""
     return _bhattacharyya_angle(trace_distribution(model1), trace_distribution(model2))

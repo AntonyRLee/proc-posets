@@ -10,9 +10,12 @@ The contrast between the two on the same pair of models is the point of the sand
 from __future__ import annotations
 
 import math
+from typing import Literal, Optional
 
 from .matrix import END, START, build, normal_form_distribution
 from .poset import Model
+
+Mode = Literal["sink", "selfloop"]  # matrix-normalisation on the common state space
 
 # Matrix normalisation on the common state space (docs/DESIGN-comparison-object.md, TODO §8):
 #   "selfloop" (option 1) -- unused state s -> s; END -> END (absorbing). Distance-paper convention.
@@ -59,7 +62,8 @@ def _bhattacharyya_angle(p: dict[str, float], q: dict[str, float]) -> float:
     return 2.0 * math.acos(_clamp01(_bc(p, q, set(p) | set(q))))
 
 
-def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[float, dict[str, float]]:
+def smd_rows(built1, built2, mode: Optional[Mode] = None, normalize: bool = False,
+             states: Optional[list[str]] = None) -> tuple[float, dict[str, float]]:
     """SMD between two already-BUILT (matrix, states) pairs -- for reusing builds, or for
     comparing against a hand-built chain that no finite variant set produces (e.g. the cyclic
     loop limit of `spm.loops.loop_limit`).
@@ -94,8 +98,8 @@ def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[f
     return 2.0 * math.sqrt(total) * scale, per_block
 
 
-def smd(model1: Model, model2: Model, mode=None, context_depth: int = 1,
-        normalize=False) -> tuple[float, dict[str, float]]:
+def smd(model1: Model, model2: Model, mode: Optional[Mode] = None, context_depth: int = 1,
+        normalize: bool = False) -> tuple[float, dict[str, float]]:
     """Stochastic-matrix distance (Result 3) + the per-state (per-block) angle breakdown
     (the diagnostic: which block drives the divergence). `mode` selects the normalisation
     ("sink" default, or "selfloop"); see NORMALISATION above. `context_depth` is the VLMC dial
@@ -128,8 +132,8 @@ def _pairwise_rows(rowmaps, states, normalize=False) -> list[list[float]]:
     return D
 
 
-def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1,
-                 normalize=False) -> list[list[float]]:
+def smd_pairwise(models: list[Model], mode: Optional[Mode] = None, context_depth: int = 1,
+                 normalize: bool = False) -> list[list[float]]:
     """Pairwise SMD over a fleet of models, building each block matrix ONCE on the fleet-wide
     common state space X (the union over ALL models).
 

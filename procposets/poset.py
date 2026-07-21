@@ -20,14 +20,21 @@ _ids = itertools.count()
 
 @dataclass
 class Poset:
+    """A labelled finite poset: opaque integer ``elements``, their activity
+    ``labels`` side-table (so labels may REPEAT), and the strict order ``less`` as
+    a transitively-closed set of ``(u, v)`` = "u < v" pairs.  Only labels matter
+    for comparison; the ids keep repeated-label elements distinct."""
+
     elements: list[int]
     labels: dict[int, str]
     less: set[tuple[int, int]] = field(default_factory=set)  # (u, v) means u < v, transitively closed
 
     def comparable(self, u: int, v: int) -> bool:
+        """Are elements ``u`` and ``v`` ordered either way (not incomparable)?"""
         return (u, v) in self.less or (v, u) in self.less
 
     def restrict(self, sub: list[int]) -> "Poset":
+        """The induced sub-poset on the element ids ``sub`` (order restricted)."""
         s = set(sub)
         return Poset(
             list(sub),

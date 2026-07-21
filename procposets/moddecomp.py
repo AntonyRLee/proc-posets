@@ -169,7 +169,11 @@ def _components(nodes: list[int], edge) -> list[list[int]]:
 
 # --- decomposition ------------------------------------------------------------
 
-def decompose(P: Poset):
+def decompose(P: Poset) -> "Leaf | Series | Parallel | Prime":
+    """The Gallai modular-decomposition tree of ``P`` (see the module docstring):
+    a single element is a ``Leaf``; a disconnected comparability graph is a
+    ``Parallel`` node, a disconnected complement a ``Series`` node (co-components
+    ordered low->high); otherwise the fragment is one atomic ``Prime`` tile."""
     V = P.elements
     if len(V) == 1:
         return Leaf(P.labels[V[0]])
