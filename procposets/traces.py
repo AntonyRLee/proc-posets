@@ -7,9 +7,9 @@ between genuine concurrency and a coin-flip between orders.
 """
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 
+from .distance import _bhattacharyya_angle
 from .poset import Model, Poset
 
 
@@ -44,8 +44,4 @@ def trace_distribution(model: Model) -> dict[tuple[str, ...], float]:
 
 
 def trace_bhattacharyya(model1: Model, model2: Model) -> float:
-    p = trace_distribution(model1)
-    q = trace_distribution(model2)
-    support = set(p) | set(q)
-    bc = min(1.0, max(0.0, sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in support)))
-    return 2.0 * math.acos(bc)
+    return _bhattacharyya_angle(trace_distribution(model1), trace_distribution(model2))

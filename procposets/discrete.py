@@ -36,7 +36,7 @@ from __future__ import annotations
 import math
 from itertools import combinations
 
-from .distance import _augment
+from .distance import _augment, _row_angle
 from .matrix import END, START, build
 from .moddecomp import Parallel, Prime, Series, decompose
 from .poset import Poset
@@ -100,8 +100,7 @@ def order_angle(m1, m2):
     total = 0.0
     per = {}
     for pair in p1:
-        bc = sum(math.sqrt(p1[pair][o] * p2[pair][o]) for o in ("lt", "gt", "par"))
-        ang = math.acos(min(1.0, max(0.0, bc)))
+        ang = _row_angle(p1[pair], p2[pair], ("lt", "gt", "par"))
         per[pair] = ang
         total += ang * ang
     return 2.0 * math.sqrt(total), per
@@ -132,8 +131,7 @@ def _matrix_angle(a1, a2, states):
     total = 0.0
     per = {}
     for s in states:
-        bc = sum(math.sqrt(a1[s].get(t, 0.0) * a2[s].get(t, 0.0)) for t in states)
-        ang = math.acos(min(1.0, max(0.0, bc)))
+        ang = _row_angle(a1[s], a2[s], states)
         per[s] = ang
         total += ang * ang
     return 2.0 * math.sqrt(total), per

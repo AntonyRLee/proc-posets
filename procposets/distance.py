@@ -35,8 +35,28 @@ def _augment(matrix, states, mode=None):
     return out
 
 
-def _bc(row1: dict[str, float], row2: dict[str, float], states: list[str]) -> float:
-    return sum(math.sqrt(row1.get(s, 0.0) * row2.get(s, 0.0)) for s in states)
+def _bc(row1: dict[str, float], row2: dict[str, float], keys) -> float:
+    """Bhattacharyya coefficient of two rows over `keys` (in `keys` order)."""
+    return sum(math.sqrt(row1.get(k, 0.0) * row2.get(k, 0.0)) for k in keys)
+
+
+def _clamp01(x: float) -> float:
+    """Clamp a Bhattacharyya coefficient into [0, 1] (guards ``acos`` against fp drift)."""
+    return min(1.0, max(0.0, x))
+
+
+def _row_angle(row1: dict[str, float], row2: dict[str, float], keys) -> float:
+    """Per-row Bhattacharyya angle ``arccos(BC)`` -- the per-state SMD term. BC is
+    summed in `keys` order, so passing the same key sequence reproduces the exact
+    float accumulation of the open-coded form it replaces."""
+    return math.acos(_clamp01(_bc(row1, row2, keys)))
+
+
+def _bhattacharyya_angle(p: dict[str, float], q: dict[str, float]) -> float:
+    """The single-vector Bhattacharyya angle ``2*arccos(BC)`` over ``set(p)|set(q)``
+    -- the Result-1 form shared by :func:`bhattacharyya_angle` and
+    :func:`traces.trace_bhattacharyya`."""
+    return 2.0 * math.acos(_clamp01(_bc(p, q, set(p) | set(q))))
 
 
 def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[float, dict[str, float]]:
@@ -67,8 +87,7 @@ def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[f
     total = 0.0
     per_block: dict[str, float] = {}
     for s in states:
-        bc = min(1.0, max(0.0, _bc(a1[s], a2[s], states)))
-        ang = math.acos(bc)
+        ang = _row_angle(a1[s], a2[s], states)
         per_block[s] = ang
         total += ang * ang
     scale = 1.0 / math.sqrt(len(states)) if normalize else 1.0
@@ -102,7 +121,7 @@ def _pairwise_rows(rowmaps, states, normalize=False) -> list[list[float]]:
                     continue
                 if len(r2) < len(r1):
                     r1, r2 = r2, r1
-                bc = min(1.0, max(0.0, sum(math.sqrt(v * r2.get(t, 0.0)) for t, v in r1.items())))
+                bc = _clamp01(sum(math.sqrt(v * r2.get(t, 0.0)) for t, v in r1.items()))
                 ang = math.acos(bc)
                 total += ang * ang
             D[i][j] = D[j][i] = 2.0 * math.sqrt(total) * scale
@@ -133,8 +152,6 @@ def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1,
 
 def bhattacharyya_angle(model1: Model, model2: Model) -> float:
     """Result 1: Bhattacharyya angle between the flat normal-form distributions."""
-    p = normal_form_distribution(model1)
-    q = normal_form_distribution(model2)
-    support = set(p) | set(q)
-    bc = min(1.0, max(0.0, sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in support)))
-    return 2.0 * math.acos(bc)
+    return _bhattacharyya_angle(
+        normal_form_distribution(model1), normal_form_distribution(model2)
+    )
