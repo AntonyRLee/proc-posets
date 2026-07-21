@@ -480,3 +480,34 @@ helpers and adapter build/validate wrappers ([pm4py]/[graph] — skip standalone
 `cospan/_boundary.py` constants single-source; tree-block flatten skeleton
 (`matrix._block_sequence`/`discrete._block_items` — windowing part is
 `changes-values`).
+
+### Phase 3 — maintainability, types, docs, landed 2026-07-21 (suite: 343 passed, 20 skipped)
+Each split is a pure extraction; float/structure-sensitive ones gated by a fixed-seed
+before/after value capture **byte-identical** + full suite.
+- **Dead code** (`a0b55f6`) — unused imports (discrete `linear_extensions`, grouping
+  `Callable`/`Sequence`), dead `extract_dp._nontrivial_sccs`, dead `chain` payload +
+  unreachable branch in `equivalence._activity_pomsets`. Kept public `.atomic`
+  (no in-repo reads but a consumer may use it).
+- **God-function splits** (5): `Oracle.__init__` → `_select_candidates` + `_build_atoms`
+  (`92344ac`, captured across 7 regimes); `npmle.fit` → named FW budgets +
+  `_tighten_restricted` (`3f6acd2`, weights@17dp identical); `discrete._build_refined`
+  → `_refined_step` (`9094a2f`); `to_event_dag` → `_assemble_event_dag` (`f7388f4`,
+  10 direct occurrence tests); `splice.from_extraction_result` → `_build_loop_fragments`
+  (`b464805`, 464-line to_dict identical).
+- **Docs** (`c6ef417`, `fb2b1c2`) — fixed all stale `cpm.` Sphinx refs (→ `procposets.`),
+  demoted 4 external refs, fixed broken `:func:occn_leg_constraints`, `PosetClass`
+  Protocol→ABC, drifted `cospan`/`occn` `__init__`; added docstrings to `Poset`,
+  `TrueMixture`, `Oracle`, `moddecomp.decompose`, `traces.*`; clarified misleading
+  `reweight`/`Marker.activity`; made the two runtime-string `Step` aliases real; typed
+  the `mode`/`weighting` string-enums with `Literal`.
+
+**Phase 3 deferred, with rationale:**
+- `extract_classes` — left as-is: already factored into `_mint`/`closing_pomsets`
+  nested closures over heavily-shared mutable state (memo/path/scc); further extraction
+  is net-negative on risk. Its safety was already improved (the Phase-0 cap).
+- `string_diagram.render` split — belongs with the Phase-6 `viz/_layout.py` file-split;
+  its figures are **not** byte-pinned by any golden here, so a split can't be verified
+  in this checkout.
+- Long-tail type annotations on graph/viz internal helpers (bare `dict`/`tuple`/
+  `frozenset` params) — lower value; the load-bearing ones already carry `# real-type`
+  comments.
