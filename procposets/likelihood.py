@@ -50,6 +50,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ._extensions import preds as _preds
 from .rel import (
     GENERAL,
     Rel,
@@ -306,7 +307,7 @@ class TimedGroupedLog(GroupedLog):
     def _k_vectors(self, rel: Rel) -> List[np.ndarray]:
         """Per distinct ordinal trace: the vector of enabled-counts k_j."""
         if rel not in self._k_cache:
-            preds = {e: {a for (a, b) in rel if b == e} for e in self.alphabet}
+            preds = _preds(self.alphabet, rel)  # {e: frozenset(predecessors)}
             out = []
             for t in self.traces:
                 rem = set(t)
