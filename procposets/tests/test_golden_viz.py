@@ -14,7 +14,7 @@ import pytest
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-SIM = pathlib.Path("/home/arl/Research/-DIAGRAM-String-diagrams-for-process-mining-v2/sim")
+SIM = pathlib.Path("/home/arl/Research/string-diagram-process-mining/sim")
 
 pytestmark = pytest.mark.viz
 
