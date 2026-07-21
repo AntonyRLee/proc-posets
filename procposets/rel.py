@@ -164,34 +164,43 @@ def enumerate_posets(elements: Iterable[str]) -> List[Rel]:
                             | frozenset((ek, u) for u in U)
                         )
         posets = nxt
-    return sorted(posets, key=lambda r: (len(r), sorted(r)))
+    return sorted(posets, key=_canonical_key)
 
 
-def _ideals(elements: Sequence[str], rel: Rel) -> List[FrozenSet[str]]:
-    """All order ideals (down-closed sets) of a poset, by brute subset check
-    (elements here never exceeds the enumeration bound, so 2^m is small)."""
+def _canonical_key(r: Rel):
+    """Canonical ordering of a relation set: ``(size, sorted pairs)``.  Single
+    source for the sort key that ``enumerate_posets`` / ``meet_closure`` /
+    ``enumerate_sp`` each spelled inline."""
+    return (len(r), sorted(r))
+
+
+def _closed_sets(elements: Sequence[str], rel: Rel, *, down: bool) -> List[FrozenSet[str]]:
+    """Order ideals (``down=True``: down-closed sets) or filters (``down=False``:
+    up-closed sets) of a poset, by brute 2^n subset check (elements here never
+    exceeds the enumeration bound, so 2^m is small).  ``_ideals``/``_filters`` are
+    the same scan differing only in the neighbour direction."""
     els = list(elements)
     n = len(els)
-    down = {e: {a for (a, b) in rel if b == e} for e in els}
+    if down:
+        nbr = {e: {a for (a, b) in rel if b == e} for e in els}
+    else:
+        nbr = {e: {b for (a, b) in rel if a == e} for e in els}
     out = []
     for mask in range(2 ** n):
         s = {els[i] for i in range(n) if mask >> i & 1}
-        if all(down[e] <= s for e in s):
+        if all(nbr[e] <= s for e in s):
             out.append(frozenset(s))
     return out
+
+
+def _ideals(elements: Sequence[str], rel: Rel) -> List[FrozenSet[str]]:
+    """All order ideals (down-closed sets) of a poset."""
+    return _closed_sets(elements, rel, down=True)
 
 
 def _filters(elements: Sequence[str], rel: Rel) -> List[FrozenSet[str]]:
     """All filters (up-closed sets) of a poset."""
-    els = list(elements)
-    n = len(els)
-    up = {e: {b for (a, b) in rel if a == e} for e in els}
-    out = []
-    for mask in range(2 ** n):
-        s = {els[i] for i in range(n) if mask >> i & 1}
-        if all(up[e] <= s for e in s):
-            out.append(frozenset(s))
-    return out
+    return _closed_sets(elements, rel, down=False)
 
 
 def meet_closure(rels: Iterable[Rel], cap: int = 200_000) -> Tuple[List[Rel], bool]:
@@ -203,16 +212,15 @@ def meet_closure(rels: Iterable[Rel], cap: int = 200_000) -> Tuple[List[Rel], bo
     rare data sets where the closure is truncated and the certificate reverts
     to lattice-restricted status.
     """
-    _key = lambda r: (len(r), sorted(r))  # noqa: E731 -- canonical order
     closed = set(rels)
     # frontier and base iterate in canonical sorted order so that a cap hit
     # truncates deterministically -- hash order made the kept subset vary
     # with PYTHONHASHSEED, making the downgraded regime irreproducible
     # (DESIGN_REVIEW W12.4)
-    frontier = sorted(closed, key=_key)
+    frontier = sorted(closed, key=_canonical_key)
     hit_cap = False
     while frontier and not hit_cap:
-        base = sorted(closed, key=_key)
+        base = sorted(closed, key=_canonical_key)
         fresh = set()
         for r1 in frontier:
             for r2 in base:
@@ -225,8 +233,8 @@ def meet_closure(rels: Iterable[Rel], cap: int = 200_000) -> Tuple[List[Rel], bo
             if hit_cap:
                 break
         closed |= fresh
-        frontier = sorted(fresh, key=_key)
-    return sorted(closed, key=_key), hit_cap
+        frontier = sorted(fresh, key=_canonical_key)
+    return sorted(closed, key=_canonical_key), hit_cap
 
 
 # ---------------------------------------------------------------------------
@@ -426,7 +434,7 @@ def enumerate_sp(elements: Iterable[str]) -> List[Rel]:
                         out.add(ra | rb)
         return frozenset(out)
 
-    return sorted(rec(els), key=lambda r: (len(r), sorted(r)))
+    return sorted(rec(els), key=_canonical_key)
 
 
 # ---------------------------------------------------------------------------
