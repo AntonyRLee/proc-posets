@@ -32,6 +32,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from .._extensions import count_extensions as _count_ext
 from .class_extraction import (
     ExtractionResult,
     NamedMorphism,
@@ -379,9 +380,15 @@ def _layered_dag(term: AlgebraicTerm) -> nx.DiGraph:
 
 
 def _count_linear_extensions(g: nx.DiGraph, cap_nodes: int = 11) -> int | None:
+    # >cap_nodes fragments stay "not verifiably exact" (None -- the contract
+    # _sp_exact reads). Below the cap, count via the guarded ideal-lattice DP
+    # (_extensions.count_extensions, O(2^width) states) instead of enumerating
+    # every width! topological sort: an 11-wide antichain is 2^11=2048 states
+    # vs 11!~4e7 sorts. The count is identical -- linear extensions of the DAG's
+    # reachability order -- and no budget refusal can fire below 11 nodes.
     if g.number_of_nodes() > cap_nodes:
         return None
-    return sum(1 for _ in nx.all_topological_sorts(g))
+    return _count_ext(list(g.nodes()), set(g.edges()))
 
 
 def _sp_exact(term: AlgebraicTerm, dag) -> bool:
