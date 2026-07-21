@@ -425,3 +425,18 @@ the fixed corpus, per the migration discipline.
   `morphism_schema.shape_key` unweighted `Counter`; timed-sampler shared-alphabet
   assumption. Recommend investigating against the geometry/estimation intent + the
   cpm goldens before any change.
+
+### Phase 1a — boundary-predicate hazard (1.2), landed 2026-07-21 (suite: 343 passed, 20 skipped)
+The P0 naming hazard: `signature_compare.is_boundary_label` (gamma-inclusive) and
+`signature_diff._is_boundary_label` (`START_`/`END_` only) were near-identical
+names with **different membership**. Fixed by renaming in place to self-documenting,
+membership-matching names — **bodies byte-identical (value-preserving)**:
+- `signature_compare.is_boundary_label` → **`is_gamma_or_marker`**; kept
+  `is_boundary_label = is_gamma_or_marker` as a back-compat alias.
+- `signature_diff._is_boundary_label` → **`_is_start_end_marker`**.
+- New `test_cpm_boundary_predicates.py` (4 tests) pins the distinct membership +
+  the alias.
+- **Deferred:** single-sourcing the constants + predicates into a dependency-free
+  `cospan/_boundary.py` (plan §2.6) — a bigger surface across byte-exact-critical
+  modules whose cpm cross-checks skip in this checkout; do it with the consumer
+  repos present for full gating.

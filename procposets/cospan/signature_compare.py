@@ -23,7 +23,7 @@ cardinalities) and any multi-leg relations (shared-key partitions). Two notation
 Modular by construction: :func:`compare` takes ``{notation: Signature}`` for any
 number of notations, so a newly-added notation is just another entry -- no code
 change. Boundary generators (``gamma1``/``gamma2``/``START_<ot>``/``END_<ot>``) are
-flagged (:func:`is_boundary_label`) and sorted last, because their *encoding*
+flagged (:func:`is_gamma_or_marker`) and sorted last, because their *encoding*
 differs by adapter convention (master's single γ1/γ2 interface §39 vs OCCN's
 per-type START/END §40) -- a real, documented structural difference the matrix
 should show honestly rather than force-align.
@@ -40,15 +40,22 @@ from .signature import Generator, Signature
 INF = None
 
 
-def is_boundary_label(label: str) -> bool:
-    """A start/end boundary generator, whose label encoding is adapter-specific
-    (``gamma1``/``gamma2`` vs ``START_<ot>``/``END_<ot>``) and so is grouped apart
-    from the interior activities that genuinely align across notations."""
+def is_gamma_or_marker(label: str) -> bool:
+    """ANY boundary generator: a master ``gamma1``/``gamma2`` OR an OCCN per-type
+    ``START_<ot>``/``END_<ot>`` wrapper.  Whose encoding is adapter-specific, so it
+    is grouped apart from the interior activities that genuinely align across
+    notations.  NB the *gamma-inclusive* membership -- distinct from
+    :func:`signature_diff._is_start_end_marker`, which is ``START_``/``END_`` only
+    (the two were once both called ``[_]is_boundary_label``, a hazard)."""
     return (
         label in ("gamma1", "gamma2")
         or label.startswith("START_")
         or label.startswith("END_")
     )
+
+
+# Back-compat alias for the pre-rename name (gamma-inclusive membership).
+is_boundary_label = is_gamma_or_marker
 
 
 def _type_multiset(ports) -> tuple:
@@ -67,7 +74,7 @@ class CanonKey:
 
     @property
     def boundary(self) -> bool:
-        return is_boundary_label(self.label)
+        return is_gamma_or_marker(self.label)
 
     def arity_str(self) -> str:
         def side(ms: tuple) -> str:
