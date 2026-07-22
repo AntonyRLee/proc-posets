@@ -204,8 +204,3 @@ def mine_occn(ocel, **fhm_kwargs) -> OCCN:
     return OCCN(ocdg, _aggregate(in_per_event, act_of), _aggregate(out_per_event, act_of))
 
 
-def _fmt_group(group: MarkerGroup) -> str:
-    return "{" + ", ".join(
-        f"({m.activity},{m.otype},k{m.key},[{m.cmin},{m.cmax}])"
-        for m in sorted(group, key=lambda m: (m.otype, m.activity))
-    ) + "}"

@@ -15,7 +15,6 @@ from __future__ import annotations
 ALIZARIN = "#D2292D"          # red variant   (string_diagram, signature_diagram)
 COTTON_BLUE = "#1761B0"       # blue variant  (string_diagram, signature_diagram)
 OLD_BLACK = "#282828"         # black variant (string_diagram, signature_diagram)
-GREY = "#9E9E9E"              # unused spare  (string_diagram)
 ALL_MODELS_GREEN = "#2ca02c"  # every model agrees (dag_render all-models combo)
 BOUNDARY_GREY = "#bbbbbb"     # IN/OUT / gamma boundary roots (dag_render, signature_diagram)
 SPLICE_BROWN = "#8c564b"      # dag_render dashed loop/splice edge

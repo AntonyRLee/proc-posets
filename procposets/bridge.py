@@ -10,7 +10,6 @@ two same-labelled elements into one `Rel` pair.
 
 from __future__ import annotations
 
-import itertools
 from typing import Iterable
 
 from .poset import Poset
