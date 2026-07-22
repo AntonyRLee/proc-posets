@@ -94,7 +94,7 @@ class Ref:
 
 # A recorded step: a single generator firing, an `@`-merged simultaneous
 # group, or a reference to a previously-named fragment.
-Step = "Generator | frozenset[Generator] | Ref"
+Step = Generator | frozenset[Generator] | Ref
 
 
 def _step_str(step) -> str:

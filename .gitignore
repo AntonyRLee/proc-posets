@@ -5,3 +5,7 @@ __pycache__/
 .claude/settings.local.json
 dist/
 *.egg-info/
+# scratch must not accumulate inside the importable package
+procposets/**/*.zip
+procposets/**/*.md
+sandbox/

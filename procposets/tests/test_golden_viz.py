@@ -14,7 +14,7 @@ import pytest
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-SIM = pathlib.Path("/home/arl/Research/-DIAGRAM-String-diagrams-for-process-mining-v2/sim")
+SIM = pathlib.Path("/home/arl/Research/string-diagram-process-mining/sim")
 
 pytestmark = pytest.mark.viz
 
@@ -60,6 +60,41 @@ def test_string_diagram_renders_headless():
     diagram = sd.D(sig, "a", 0)          # 'a' spans 2 generators; pick the first
     fig = sd.render(diagram, sig, title="smoke")
     assert isinstance(fig, Figure)
+
+
+def test_string_diagram_style_overrides_change_output():
+    # Phase-4 item 9: the golden above only exercises DEFAULTS, so a silently-ignored
+    # style= (or a default_factory bug) would pass it. This exercises BOTH a LAYOUT knob
+    # and a DRAW knob and asserts each changes output vs the default run.
+    pytest.importorskip("matplotlib")
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import procposets.viz.string_diagram as sd
+
+    sig = _signature()
+    d = sd.D(sig, "b")  # single box with one (untyped) port
+
+    def box_y(style):
+        fig = sd.render(d, sig, style=style)
+        y = round(fig.axes[0].texts[0].get_position()[1], 4)
+        plt.close(fig)
+        return y
+
+    # LAYOUT knob: type_lanes pins every port onto its type's lane, moving the box.
+    default_y = box_y(None)  # bridge: builds from the (default) globals
+    lane = sd.StringDiagramStyle(layout=sd.LayoutStyle(type_lanes={None: 50.0}))
+    lane_y = box_y(lane)
+    assert lane_y != default_y, "type_lanes did not change the layout"
+    assert lane_y == 50.0  # the box centres on the (only) type's lane
+
+    # DRAW knob: box_label_map + box_label_fontsize must reach the rendered text
+    draw = sd.StringDiagramStyle(draw=sd.DrawStyle(box_label_map={"b": "XYZ"}, box_label_fontsize=17))
+    fig = sd.render(d, sig, style=draw)
+    texts = {t.get_text(): t.get_fontsize() for t in fig.axes[0].texts}
+    assert "XYZ" in texts and texts["XYZ"] == 17
+    assert "b" not in texts  # remapped
+    plt.close(fig)
 
 
 def test_spm_viz_extract_generators_pinned():

@@ -35,13 +35,13 @@ from __future__ import annotations
 
 import math
 from itertools import combinations
+from typing import Literal
 
-from .distance import _augment
+from .distance import _augment, _row_angle, _row_angle_sparse
 from .matrix import END, START, build
 from .moddecomp import Parallel, Prime, Series, decompose
 from .poset import Poset
 from .poset import count_extensions
-from .traces import linear_extensions
 
 # --------------------------------------------------------------------------- Kemeny family
 
@@ -67,9 +67,13 @@ def _alphabet(model):
     return sorted(V)
 
 
-def _pair_relation(P: Poset, x: str, y: str) -> str:
-    """'lt' if x<y, 'gt' if y<x, else 'par' (incomparable), by label in a distinct-label poset."""
-    inv = {lab: e for e, lab in P.labels.items()}
+def _pair_relation(P: Poset, x: str, y: str, inv=None) -> str:
+    """'lt' if x<y, 'gt' if y<x, else 'par' (incomparable), by label in a distinct-label poset.
+
+    ``inv`` (label->element) may be supplied to skip rebuilding it per call -- it
+    depends only on ``P``, so a caller looping over many (x, y) hoists it once."""
+    if inv is None:
+        inv = {lab: e for e, lab in P.labels.items()}
     ex, ey = inv[x], inv[y]
     if (ex, ey) in P.less:
         return "lt"
@@ -82,11 +86,16 @@ def precedence(model):
     """For each unordered label pair, the rho-weighted categorical over {lt, gt, par}."""
     V = _alphabet(model)
     tot = sum(w for _, w in model) or 1.0
+    # inv depends only on P, not the (x, y) pair, so build it once per variant
+    # instead of rebuilding it inside the C(|V|,2)*|model| inner loop.  The
+    # pair-outer / variant-inner order is unchanged, so cat[rel] += w/tot
+    # accumulates the identical float contributions in the identical order.
+    invs = [{lab: e for e, lab in P.labels.items()} for P, _ in model]
     out = {}
     for x, y in combinations(V, 2):
         cat = {"lt": 0.0, "gt": 0.0, "par": 0.0}
-        for P, w in model:
-            cat[_pair_relation(P, x, y)] += w / tot
+        for (P, w), inv in zip(model, invs):
+            cat[_pair_relation(P, x, y, inv)] += w / tot
         out[(x, y)] = cat
     return out
 
@@ -100,8 +109,7 @@ def order_angle(m1, m2):
     total = 0.0
     per = {}
     for pair in p1:
-        bc = sum(math.sqrt(p1[pair][o] * p2[pair][o]) for o in ("lt", "gt", "par"))
-        ang = math.acos(min(1.0, max(0.0, bc)))
+        ang = _row_angle(p1[pair], p2[pair], ("lt", "gt", "par"))
         per[pair] = ang
         total += ang * ang
     return 2.0 * math.sqrt(total), per
@@ -129,17 +137,18 @@ def _support_uniformise(row):
 
 
 def _matrix_angle(a1, a2, states):
+    key_idx = {s: i for i, s in enumerate(states)}  # dense-key positions, built once
     total = 0.0
     per = {}
     for s in states:
-        bc = sum(math.sqrt(a1[s].get(t, 0.0) * a2[s].get(t, 0.0)) for t in states)
-        ang = math.acos(min(1.0, max(0.0, bc)))
+        ang = _row_angle_sparse(a1[s], a2[s], key_idx)
         per[s] = ang
         total += ang * ang
     return 2.0 * math.sqrt(total), per
 
 
-def block_angle(m1, m2, weighting="uniform_variant", context_depth=1):
+def block_angle(m1, m2, weighting: Literal["uniform_variant", "support", "lincount"] = "uniform_variant",
+                context_depth: int = 1):
     """Block-SMD between two models under one of the three weightings (option 1/2/3).
 
     For 'support' the row frequencies are discarded: each row is made uniform over its support on the
@@ -310,6 +319,23 @@ def _normalise_refine(refine):
     return kinds
 
 
+def _refined_step(kind, atoms, sym, ctx, total, k, kinds):
+    """One block item's transition, as ``(targets, new_frontier)``: an atomic
+    window step (all mass to one '|'-joined last-<=k-blocks state) or a uniform
+    fan-out over the context-typed atoms.  ``targets[state]`` is the per-source
+    fraction; ``new_frontier[state]`` is that fraction times the incoming mass."""
+    prefix = ctx[-(k - 1):] if k > 1 else []
+    if kind == "block" or kind not in kinds:       # atomic step: standard window state
+        win = "|".join((ctx + [sym])[-k:])
+        return {win: 1.0}, {win: total}            # each source sends all its mass
+    atoms = atoms or ["<empty>"]                   # fan-out over context-typed atoms
+    targets: dict = {}
+    for a in atoms:                                # multiset-safe: duplicates accumulate
+        st = "|".join(prefix + [a])
+        targets[st] = targets.get(st, 0.0) + 1.0 / len(atoms)
+    return targets, {st: f * total for st, f in targets.items()}
+
+
 def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = True,
                    recursive: bool = False, chain_k=2):
     """Block matrix in which blocks of the selected `kinds` fan out over their atoms.
@@ -342,18 +368,7 @@ def _build_refined(model, kinds: set, context_depth: int = 1, strict: bool = Tru
         ctx: list = []                                     # block symbols emitted so far
         for kind, atoms, sym in _block_items(decompose(P), recursive, chain_k):
             total = sum(frontier.values())
-            prefix = ctx[-(k - 1):] if k > 1 else []
-            if kind == "block" or kind not in kinds:       # atomic step: standard window state
-                win = "|".join((ctx + [sym])[-k:])
-                targets = {win: 1.0}                       # each source sends all its mass
-                new_frontier = {win: total}
-            else:                                          # fan-out over context-typed atoms
-                atoms = atoms or ["<empty>"]
-                targets = {}
-                for a in atoms:                            # multiset-safe: duplicates accumulate
-                    st = "|".join(prefix + [a])
-                    targets[st] = targets.get(st, 0.0) + 1.0 / len(atoms)
-                new_frontier = {st: f * total for st, f in targets.items()}
+            targets, new_frontier = _refined_step(kind, atoms, sym, ctx, total, k, kinds)
             hit = set(new_frontier) & visited
             if hit and strict:
                 raise ValueError(

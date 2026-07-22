@@ -20,14 +20,21 @@ _ids = itertools.count()
 
 @dataclass
 class Poset:
+    """A labelled finite poset: opaque integer ``elements``, their activity
+    ``labels`` side-table (so labels may REPEAT), and the strict order ``less`` as
+    a transitively-closed set of ``(u, v)`` = "u < v" pairs.  Only labels matter
+    for comparison; the ids keep repeated-label elements distinct."""
+
     elements: list[int]
     labels: dict[int, str]
     less: set[tuple[int, int]] = field(default_factory=set)  # (u, v) means u < v, transitively closed
 
     def comparable(self, u: int, v: int) -> bool:
+        """Are elements ``u`` and ``v`` ordered either way (not incomparable)?"""
         return (u, v) in self.less or (v, u) in self.less
 
     def restrict(self, sub: list[int]) -> "Poset":
+        """The induced sub-poset on the element ids ``sub`` (order restricted)."""
         s = set(sub)
         return Poset(
             list(sub),
@@ -37,6 +44,13 @@ class Poset:
 
     def __len__(self) -> int:
         return len(self.elements)
+
+
+# A *model* is a weighted set of labelled posets (its variants): the object the
+# distance / estimation / trace / loop layers all operate on.  Single home for the
+# alias that four of those modules each used to redefine (and ``traces`` weakened
+# to a bare ``list``).  Annotation-only -- never constructed at runtime.
+Model = list[tuple[Poset, float]]
 
 
 def _transitive_closure(less: set) -> set:
@@ -71,7 +85,15 @@ def leaf(label: str) -> Poset:
 
 
 def then(*parts: Poset) -> Poset:
-    """Sequential composition: part_0 < part_1 < ... (ordinal sum)."""
+    """Sequential composition of ``Poset`` objects: part_0 < part_1 < ... (ordinal sum).
+
+    The ``Poset``-object (id+label, repeated-label-capable) series combinator,
+    rendered via the moddecomp ``;``/``*`` view. Intentionally named ``then``/``par``
+    per this type -- the distinct-label ``SPTree`` combinators are
+    :func:`procposets.rel_sp.series` / :func:`procposets.rel_sp.parallel` (and the
+    package-root ``series``/``parallel`` bind THOSE), so the two SP-composition
+    vocabularies are NOT interchangeable.
+    """
     parts = [_fresh(p) for p in parts]
     elements: list[int] = []
     labels: dict[int, str] = {}
@@ -89,7 +111,10 @@ def then(*parts: Poset) -> Poset:
 
 
 def par(*parts: Poset) -> Poset:
-    """Parallel composition: disjoint union, no cross relations (antichain of blocks)."""
+    """Parallel composition of ``Poset`` objects: disjoint union, no cross relations
+    (antichain of blocks). The ``Poset``-object parallel combinator; named ``par``
+    (not ``parallel``) because the ``parallel`` name is the ``SPTree`` constructor
+    :func:`procposets.rel_sp.parallel` -- see :func:`then`."""
     parts = [_fresh(p) for p in parts]
     elements: list[int] = []
     labels: dict[int, str] = {}
@@ -149,7 +174,7 @@ def from_dag(edges, nodes=()) -> Poset:
 
 from ._extensions import IdealBudgetExceeded  # noqa: E402,F401  (re-export)
 from ._extensions import count_extensions as _count
-from ._extensions import sample_extension as _sample
+from ._extensions import sample_extension_poset as _sample
 
 
 def count_extensions(P: "Poset") -> int:

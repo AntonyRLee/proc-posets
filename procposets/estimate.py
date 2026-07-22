@@ -27,10 +27,9 @@ import math
 import random
 from collections import Counter, defaultdict
 
-from .poset import Poset
+from .poset import Model, Poset
 from .traces import linear_extensions, trace_distribution
 
-Model = list[tuple[Poset, float]]
 Trace = tuple[str, ...]
 Law = dict[Trace, float]
 
@@ -41,7 +40,9 @@ def variant_laws(variants: list[Poset]) -> list[Law]:
 
 
 def reweight(variants: list[Poset], rho: list[float]) -> Model:
-    """The model (P(rho) input) with weights rho -- analytic if rho is true, empirical if estimated."""
+    """Pair each variant poset with its weight -> a ``Model``.  Despite the name
+    this is a Model *constructor* (it zips ``variants`` with the given ``rho``), not
+    an in-place reweighting: ``rho`` is analytic if true, empirical if estimated."""
     return list(zip(variants, rho))
 
 

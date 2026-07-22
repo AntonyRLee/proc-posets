@@ -52,7 +52,8 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from .likelihood import Atom, GroupedLog, TimedGroupedLog
-from .oracle import Oracle, _log_mean_exp_rows
+from ._numerics import _log_mean_exp_rows
+from .oracle import Oracle
 
 
 def _moment_seed_atom(oracle: Oracle, log: GroupedLog, init_order) -> int:
@@ -173,8 +174,20 @@ def _mixture_logd(logF_active: np.ndarray, w: np.ndarray) -> np.ndarray:
     return zmax + np.log(np.exp(z - zmax).sum(axis=0))
 
 
+# --- Frank-Wolfe budgets (named so their coupling is visible) ---------------
+_INNER_ITERS = 3000        # max fully-corrective (inner simplex) iterations
+_INNER_TOL = 1e-13         # inner-solve loglik-increment convergence tolerance
+_ENTERING_WEIGHT = 1e-3    # weight a newly column-generated atom enters at; the
+#                            next corrective step fixes it.  weight_floor must be
+#                            below this or an entering atom is pruned before that
+#                            step (see the fit() validation).
+_REPRICE_ITERS = 20        # inner tightening rounds before re-pricing a repeated
+#                            best atom (DESIGN_REVIEW W14)
+_REPRICE_GAP_RATIO = 0.1   # tighten the restricted solve to this fraction of gap_tol
+
+
 def _fully_corrective(logF_active: np.ndarray, w: np.ndarray,
-                      iters: int = 3000, tol: float = 1e-13) -> np.ndarray:
+                      iters: int = _INNER_ITERS, tol: float = _INNER_TOL) -> np.ndarray:
     G = logF_active.shape[1]
     prev = -np.inf
     for _ in range(iters):
@@ -189,6 +202,25 @@ def _fully_corrective(logF_active: np.ndarray, w: np.ndarray,
         w = np.maximum(w, 0.0)
         w /= w.sum()
     return w
+
+
+def _tighten_restricted(oracle, logF_active: np.ndarray, w: np.ndarray,
+                        gap_tol: float):
+    """W14: the best atom re-priced while already active means the *restricted*
+    (fixed-support) problem is unconverged.  Push its own fully-corrective solve
+    until its gap is in certificate currency, then re-price.  Returns
+    ``(w, ll, k_new, score, gap)`` -- the caller keeps the break/converge logic."""
+    for _ in range(_REPRICE_ITERS):
+        w = _fully_corrective(logF_active, w)
+        log_d = _mixture_logd(logF_active, w)
+        rgap = float(np.exp(
+            _log_mean_exp_rows(logF_active - log_d[None, :]).max()
+        ) - 1.0)
+        if rgap <= _REPRICE_GAP_RATIO * gap_tol:
+            break
+    ll = float(log_d.sum())
+    k_new, score = oracle.price(log_d)
+    return w, ll, k_new, score, score - 1.0
 
 
 def fit(
@@ -226,7 +258,7 @@ def fit(
     `poset_mixture.initialiser`).  It only changes the warm start, and pays
     off in the large-``m`` regime where per-candidate likelihood is the
     cost.  ``None`` (default) keeps the likelihood-argmax seed."""
-    if not 0.0 <= weight_floor < 1e-3:
+    if not 0.0 <= weight_floor < _ENTERING_WEIGHT:
         raise ValueError(
             f"weight_floor must lie in [0, 1e-3): the entering weight is 1e-3, "
             f"and a floor at or above it prunes every new atom before its "
@@ -272,22 +304,11 @@ def fit(
             converged = True
             break
         if k_new in active:
-            # The best atom is already active while gap > gap_tol: the
-            # *restricted* problem is unconverged (the inner solve's fixed
-            # iteration budget left slack) and the oracle re-priced the same
-            # atom.  Push the inner solve until its own fixed-support gap is
-            # in certificate currency, then re-price (DESIGN_REVIEW W14).
-            for _ in range(20):
-                w = _fully_corrective(logF_active, w)
-                log_d = _mixture_logd(logF_active, w)
-                rgap = float(np.exp(
-                    _log_mean_exp_rows(logF_active - log_d[None, :]).max()
-                ) - 1.0)
-                if rgap <= 0.1 * gap_tol:
-                    break
-            ll = float(log_d.sum())
-            k_new, score = oracle.price(log_d)
-            gap = score - 1.0
+            # The best atom is already active while gap > gap_tol: the restricted
+            # problem is unconverged and the oracle re-priced the same atom.
+            # Tighten the fixed-support solve, then re-price (DESIGN_REVIEW W14).
+            w, ll, k_new, score, gap = _tighten_restricted(
+                oracle, logF_active, w, gap_tol)
             history[-1] = (ll, gap)
             if gap <= gap_tol:
                 converged = True
@@ -299,7 +320,7 @@ def fit(
                 break
             # a genuinely new atom surfaced after tightening: fall through
         active.append(k_new)
-        w = np.append(w * (1 - 1e-3), 1e-3)  # tiny entering weight; corrective step fixes it
+        w = np.append(w * (1 - _ENTERING_WEIGHT), _ENTERING_WEIGHT)  # entering atom; corrected next iter
 
         # prune
         keep = w > weight_floor

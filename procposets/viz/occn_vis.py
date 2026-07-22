@@ -2,7 +2,7 @@
 heuristic/causal-net rendering that is our alternative to the Java/React
 reference (Liss et al.; driven separately by ``occn_dev/native_viz.py``).
 
-``draw_occn`` takes a :class:`cpm.occn.OCCN` (from :func:`cpm.occn.mine_occn`)
+``draw_occn`` takes a :class:`procposets.occn.OCCN` (from :func:`procposets.occn.mine_occn`)
 and saves a PNG. Visual vocabulary (mirrors the reference's input-left /
 output-right model):
 
@@ -23,11 +23,10 @@ import math
 import graphviz
 
 from ..occn.markers import Marker, OCCN
+from .palette import OCCN_PALETTE as _PALETTE
 
-_PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f"]
 
-
-def color_map(otypes) -> dict[str, str]:
+def colour_map(otypes) -> dict[str, str]:
     return {ot: _PALETTE[i % len(_PALETTE)] for i, ot in enumerate(sorted(otypes))}
 
 
@@ -35,11 +34,11 @@ def color_map(otypes) -> dict[str, str]:
 def _themed_ocpn_colors(otypes):
     """Temporarily override pm4py's OCPN object-type colouring (which is a
     hash-of-the-name -> hex, hence ugly *and* hash-seed-unstable) with our
-    :func:`color_map`, so a discovered OCPN renders in the same stable palette as
+    :func:`colour_map`, so a discovered OCPN renders in the same stable palette as
     :func:`draw_occn` (same colour per object type across both views)."""
     from pm4py.visualization.ocel.ocpn.variants import wo_decoration as w
 
-    cmap = color_map(otypes)
+    cmap = colour_map(otypes)
     orig = w.ot_to_color
     w.ot_to_color = lambda ot: cmap.get(ot, orig(ot))
     try:
@@ -69,7 +68,7 @@ def _card_label(m: Marker) -> str:
 def draw_occn(occn: OCCN, out_path: str, title: str | None = None, fmt: str = "png") -> str:
     """Render ``occn`` to ``<out_path>.<fmt>`` (graphviz appends the extension);
     returns the written path."""
-    colors = color_map(occn.ocdg.otypes)
+    colors = colour_map(occn.ocdg.otypes)
     g = graphviz.Digraph("OCCN", format=fmt)
     g.attr(rankdir="LR", nodesep="0.25", ranksep="0.9", splines="spline")
     if title:

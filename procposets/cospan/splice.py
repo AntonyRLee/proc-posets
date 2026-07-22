@@ -8,7 +8,7 @@ LLM-free form of what ``occn_dev/run_dag_comparison.py`` and
 ``dag_render.render_catalogue_dags`` compute ad hoc. It is the **finite
 generating grammar of the model's trace language** (§27c): a run γ1→γ2 is a
 family baseline with its anchored loops spliced in (any multiplicity). The
-companion :mod:`cpm.cospan.trace_language` consumes the *algebraic* form to emit
+companion :mod:`procposets.cospan.trace_language` consumes the *algebraic* form to emit
 traces up to a finite loop cut-off.
 
 Two views per fragment:
@@ -32,6 +32,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from .._extensions import count_extensions as _count_ext
 from .class_extraction import (
     ExtractionResult,
     NamedMorphism,
@@ -56,7 +57,7 @@ from .signature_diff import label_skeleton, strip_boundary_wrapper
 
 # An algebraic step: a single activity label, or a tensor group of concurrent
 # labels (canonically sorted). A loop/spine body is a sequence of these.
-Step = "str | tuple[str, ...]"
+Step = str | tuple[str, ...]
 
 
 def _is_wrapper_label(label: str) -> bool:
@@ -169,45 +170,7 @@ class SpliceRepresentation:
         wire forced both ``==1`` and ``∈[2,5]`` by two routes). ``None`` = keep all."""
         loops_nm = result.loops()
         frags = result.fragments
-
-        # Distinct loop **phasings** = (anchor, dag-key) classes: one ℓ per cut. A loop is a
-        # trace Tr(g) and the rotation-cuts of one cycle ARE one loop categorically -- but the
-        # finite splice GRAMMAR realises it through these phasings, and trace generation inserts
-        # each ℓ's own ``term`` at its site (``trace_language._expanded_sequences``). A phasing's
-        # term is only a valid insertion at its own anchor frontier, so the phasings MUST stay
-        # distinct here: merging them to one representative term inserts it at sites that matched
-        # a different phasing, manufacturing unrealisable traces (an over-generation the
-        # completeness check catches). The shared cyclic identity is exposed for *display* via
-        # ``LoopFragment.cycle`` below, without disturbing this sound per-phasing generation.
-        struct: dict[tuple, list[NamedMorphism]] = {}
-        for lp in loops_nm:
-            struct.setdefault((anchor_types(lp), canonical_key(to_event_dag(lp, frags))), []).append(lp)
-        loop_id_of_name: dict[str, str] = {}
-        phasings: list[tuple] = []  # (loop_id, rep, members)
-        for i, (key, members) in enumerate(sorted(struct.items()), start=1):
-            lid = f"ℓ{i}"
-            rep = min(members, key=lambda m: m.name)
-            for m in members:
-                loop_id_of_name[m.name] = lid
-            phasings.append((lid, rep, key))
-        # cyclic identity (display only): group phasings by their cut-invariant closed-cycle
-        # key, so the catalogue/gallery can present the rotation-cuts as one loop ``C`` while
-        # generation stays per-phasing. ``Cn`` numbered by first appearance over the sorted ℓ.
-        cycle_of_key: dict[str, str] = {}
-        loops_out: list[LoopFragment] = []
-        for lid, rep, (anchor, ckey) in phasings:
-            cyc_key = canonical_key(loop_cycle_dag(rep, frags))
-            cycle = cycle_of_key.setdefault(cyc_key, f"C{len(cycle_of_key) + 1}")
-            loops_out.append(
-                LoopFragment(
-                    loop_id=lid,
-                    term=AlgebraicTerm(strip_boundary_wrapper(label_skeleton(rep.body, frags))),
-                    anchor=anchor,
-                    key=ckey,
-                    pomset=Pomset.from_event_dag(to_event_dag(rep, frags)),
-                    cycle=cycle,
-                )
-            )
+        loops_out, loop_id_of_name = _build_loop_fragments(loops_nm, frags)
 
         # closings grouped into families by loop-free spine
         families_by_spine: dict[tuple, list[NamedMorphism]] = {}
@@ -299,6 +262,51 @@ class SpliceRepresentation:
 # --- helpers -----------------------------------------------------------------
 
 
+def _build_loop_fragments(loops_nm, frags):
+    """Loop phasings -> ``(list[LoopFragment], name->loop_id map)``.
+
+    Distinct loop **phasings** = (anchor, dag-key) classes: one ℓ per cut. A loop is a
+    trace Tr(g) and the rotation-cuts of one cycle ARE one loop categorically -- but the
+    finite splice GRAMMAR realises it through these phasings, and trace generation inserts
+    each ℓ's own ``term`` at its site (``trace_language._expanded_sequences``). A phasing's
+    term is only a valid insertion at its own anchor frontier, so the phasings MUST stay
+    distinct here: merging them to one representative term inserts it at sites that matched
+    a different phasing, manufacturing unrealisable traces (an over-generation the
+    completeness check catches). The shared cyclic identity is exposed for *display* via
+    ``LoopFragment.cycle``, without disturbing this sound per-phasing generation.
+    """
+    struct: dict[tuple, list[NamedMorphism]] = {}
+    for lp in loops_nm:
+        struct.setdefault((anchor_types(lp), canonical_key(to_event_dag(lp, frags))), []).append(lp)
+    loop_id_of_name: dict[str, str] = {}
+    phasings: list[tuple] = []  # (loop_id, rep, key)
+    for i, (key, members) in enumerate(sorted(struct.items()), start=1):
+        lid = f"ℓ{i}"
+        rep = min(members, key=lambda m: m.name)
+        for m in members:
+            loop_id_of_name[m.name] = lid
+        phasings.append((lid, rep, key))
+    # cyclic identity (display only): group phasings by their cut-invariant closed-cycle
+    # key, so the catalogue/gallery can present the rotation-cuts as one loop ``C`` while
+    # generation stays per-phasing. ``Cn`` numbered by first appearance over the sorted ℓ.
+    cycle_of_key: dict[str, str] = {}
+    loops_out: list[LoopFragment] = []
+    for lid, rep, (anchor, ckey) in phasings:
+        cyc_key = canonical_key(loop_cycle_dag(rep, frags))
+        cycle = cycle_of_key.setdefault(cyc_key, f"C{len(cycle_of_key) + 1}")
+        loops_out.append(
+            LoopFragment(
+                loop_id=lid,
+                term=AlgebraicTerm(strip_boundary_wrapper(label_skeleton(rep.body, frags))),
+                anchor=anchor,
+                key=ckey,
+                pomset=Pomset.from_event_dag(to_event_dag(rep, frags)),
+                cycle=cycle,
+            )
+        )
+    return loops_out, loop_id_of_name
+
+
 def _baseline_of(members: list[NamedMorphism], by_name: dict) -> NamedMorphism:
     """The family's drawn rep: the loop-free member if any (its stripped
     skeleton equals the spine), else the shortest member; ties by name."""
@@ -372,9 +380,15 @@ def _layered_dag(term: AlgebraicTerm) -> nx.DiGraph:
 
 
 def _count_linear_extensions(g: nx.DiGraph, cap_nodes: int = 11) -> int | None:
+    # >cap_nodes fragments stay "not verifiably exact" (None -- the contract
+    # _sp_exact reads). Below the cap, count via the guarded ideal-lattice DP
+    # (_extensions.count_extensions, O(2^width) states) instead of enumerating
+    # every width! topological sort: an 11-wide antichain is 2^11=2048 states
+    # vs 11!~4e7 sorts. The count is identical -- linear extensions of the DAG's
+    # reachability order -- and no budget refusal can fire below 11 nodes.
     if g.number_of_nodes() > cap_nodes:
         return None
-    return sum(1 for _ in nx.all_topological_sorts(g))
+    return _count_ext(list(g.nodes()), set(g.edges()))
 
 
 def _sp_exact(term: AlgebraicTerm, dag) -> bool:

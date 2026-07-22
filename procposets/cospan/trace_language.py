@@ -1,5 +1,5 @@
 """Generate a model's **trace language** (valid runs γ1→γ2) from its
-:class:`~cpm.cospan.splice.SpliceRepresentation`, up to a finite loop cut-off.
+:class:`~procposets.cospan.splice.SpliceRepresentation`, up to a finite loop cut-off.
 
 Design: ``CLASS_EXTRACTION.md`` §27c. The splice representation is the finite
 generating grammar: a run is a family baseline with its anchored loops spliced

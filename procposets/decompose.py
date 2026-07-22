@@ -26,7 +26,7 @@ from .rel import (
     extension_count,
     is_sp,
     parallel,
-    sample_extension,
+    sample_extension_tree,
     series,
     tree_relations,
 )
@@ -42,7 +42,8 @@ from .moddecomp import decompose as modular_decompose
 from .moddecomp import tiling
 
 __all__ = [
-    "SPTree", "decompose", "is_sp", "extension_count", "sample_extension",
+    "SPTree", "decompose", "is_sp", "extension_count",
+    "sample_extension_tree",
     "tree_relations", "series", "parallel", "enumerate_sp",
     "Leaf", "Series", "Parallel", "Prime", "modular_decompose", "tiling",
 ]

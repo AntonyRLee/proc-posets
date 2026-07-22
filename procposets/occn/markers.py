@@ -31,8 +31,10 @@ from .fhm import OCDG, mine_ocdg
 
 @dataclass(frozen=True)
 class Marker:
-    """One marker of a group: an arc to ``activity`` carrying ``otype`` objects,
-    with cardinality ``[cmin, cmax]`` and object-distribution ``key``."""
+    """One marker of a group: an arc to the NEIGHBOUR ``activity`` carrying
+    ``otype`` objects, with cardinality ``[cmin, cmax]`` and object-distribution
+    ``key``.  ``activity`` names the endpoint at the *other* end of the arc -- the
+    marker's owner is the activity that keys it in the I/O map, not this field."""
 
     activity: str
     otype: str

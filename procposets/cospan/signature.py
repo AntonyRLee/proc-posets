@@ -50,7 +50,7 @@ class LinearConstraint:
     inequality*; a leg mentioned by **no** constraint at all defaults to count 1.
 
     This is the general form -- arbitrary linear type-inequality constraints. The
-    OCCN bindings are the special case (see :mod:`cpm.cospan.constraints`):
+    OCCN bindings are the special case (see :mod:`procposets.cospan.constraints`):
     cardinality ``[cmin,cmax]`` on leg ``p`` = ``{p:1} >= cmin`` and
     ``{p:1} <= cmax``; a shared-key partition of input leg ``q`` over output legs
     ``p1..pk`` = ``{p1:1,...,pk:1, q:-1} == 0``."""
@@ -90,7 +90,7 @@ class Generator:
     its object-count; ports absent from it carry weight 1. Empty (the default) = every
     leg weight 1, so a symbolic/ungrounded generator behaves exactly as before. The
     unroller (:mod:`procposets.cospan.unroll_core`) sets it from a satisfying assignment of
-    ``constraints``; :func:`cpm.cospan.compose.compose_signature` reads it via
+    ``constraints``; :func:`procposets.cospan.compose.compose_signature` reads it via
     :meth:`weight`."""
 
     label: str

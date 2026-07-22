@@ -247,7 +247,11 @@ def decompose_paths(
     return {sid: _compress(skel, loop_fragments_by_body) for skel, sid in path_legend.items()}
 
 
-def _is_boundary_label(label: str) -> bool:
+def _is_start_end_marker(label: str) -> bool:
+    """A ``START_<ot>``/``END_<ot>`` per-type wrapper ONLY (NOT the master
+    ``gamma1``/``gamma2``).  Contrast :func:`signature_compare.is_gamma_or_marker`,
+    whose membership is gamma-inclusive -- the two were once both spelled
+    ``[_]is_boundary_label`` with silently different sets."""
     return label.startswith("START_") or label.startswith("END_")
 
 
@@ -267,7 +271,7 @@ def strip_boundary_wrapper(skeleton: Skeleton) -> Skeleton:
     """
     def is_boundary_step(step) -> bool:
         labels = step if isinstance(step, tuple) else (step,)
-        return all(_is_boundary_label(lbl) for lbl in labels)
+        return all(_is_start_end_marker(lbl) for lbl in labels)
 
     steps = list(skeleton)
     while steps and is_boundary_step(steps[0]):

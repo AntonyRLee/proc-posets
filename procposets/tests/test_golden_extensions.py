@@ -7,7 +7,6 @@ and the canonical Poset gains a guarded counter that refuses (rather than
 hangs on) a too-wide poset.
 """
 
-import importlib
 import pathlib
 import random
 import sys
@@ -66,11 +65,54 @@ def test_guard_refuses_a_too_wide_poset():
     """The guard travels with the counter: a very wide antichain trips
     IdealBudgetExceeded rather than hanging."""
     from procposets import poset
-    from procposets._extensions import IdealBudgetExceeded, MAX_IDEAL_STATES
+    from procposets._extensions import IdealBudgetExceeded
     # 30-element antichain: 2^30 ideals >> MAX_IDEAL_STATES
     P = poset.par(*[poset.leaf(f"x{i}") for i in range(30)])
     with pytest.raises(IdealBudgetExceeded):
         poset.count_extensions(P)
+
+
+def test_linear_extensions_refuses_materialisation_over_budget():
+    """Phase-7 #6: the materialisation guard closes the gap the ideal-budget guard
+    leaves open.  A width-13 antichain PASSES count_extensions' ideal guard (2^13
+    ideals << MAX_IDEAL_STATES) and its e(P) is returned cheaply, but has 13! (~6e9)
+    words -- so traces.linear_extensions refuses rather than exhausting memory."""
+    from procposets import poset, traces
+    from procposets._extensions import IdealBudgetExceeded
+    P = poset.par(*[poset.leaf(f"x{i}") for i in range(13)])
+    # count_extensions stays cheap and does NOT raise: 2^13 ideals is under budget,
+    # even though e(P) = 13! is huge (the ideal-DP cost is ~2^width, not e(P)).
+    assert poset.count_extensions(P) == 6_227_020_800          # 13!
+    assert 6_227_020_800 > traces.MAX_LINEAR_EXTENSIONS         # precondition
+    # ... but materialising 13! words is refused (the OOM this fix prevents).
+    with pytest.raises(IdealBudgetExceeded, match="MAX_LINEAR_EXTENSIONS"):
+        traces.linear_extensions(P)
+    # trace_distribution calls linear_extensions per variant, so it refuses too.
+    with pytest.raises(IdealBudgetExceeded):
+        traces.trace_distribution([(P, 1.0)])
+
+
+def test_linear_extensions_below_budget_byte_unchanged():
+    """Below the materialisation budget the guard is transparent: the enumerated
+    word list is identical (and equal in length to the cheap e(P) count), so the
+    guard changed no values on any realistic input."""
+    from procposets import poset, traces
+    P = poset.par(*[poset.leaf(f"x{i}") for i in range(6)])   # 6! = 720 words
+    les = traces.linear_extensions(P)
+    assert len(les) == poset.count_extensions(P) == 720
+    assert len(set(les)) == 720                              # all distinct (distinct labels)
+
+
+def test_ideal_state_bound_tall_chain_no_recursion_error():
+    """Phase-7 #3: ideal_state_bound's longest-path DP is iterative, so a chain
+    taller than the interpreter's recursion limit returns its bound (chain+1
+    ideals) instead of the RecursionError the old recursive `longest` raised."""
+    from procposets import poset
+    from procposets._extensions import ideal_state_bound
+    n = 1800  # > sys.getrecursionlimit() default (1000)
+    less = {(i, j) for i in range(n) for j in range(i + 1, n)}  # chain closure, built directly
+    P = poset.Poset(list(range(n)), {i: f"n{i}" for i in range(n)}, less)
+    assert ideal_state_bound(P.elements, P.less) == n + 1  # a chain has n+1 ideals
 
 
 def test_transitive_closure_helper_is_shared():

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from itertools import combinations, product
 
+from ._boundary import GAMMA2
 from .lmgraph import Kind, LMGraph
 from .signature import Generator, Port, Signature
 from .typebalance import Kappa, admissible
@@ -31,11 +32,10 @@ from .typebalance import Kappa, admissible
 Bundle = frozenset  # frozenset[tuple[str, str | None]]
 BundleSet = set  # set[Bundle]
 
-# Boundary endpoint label for a bare sink *place* reached forward (a discovered model with
-# no explicit terminus activity). Kept in sync with ``occurrence.GAMMA2`` (the §40 single-
-# boundary convention); local constant here to avoid an import cycle. (There is deliberately
-# no GAMMA1 counterpart: backward dead-ends stay zero-left origins, see ``_traverse``.)
-GAMMA2 = "gamma2"
+# ``GAMMA2`` (imported from the dependency-free ``_boundary`` leaf) is the boundary
+# endpoint label for a bare sink *place* reached forward -- a discovered model with no
+# explicit terminus activity (§40 single-boundary convention). There is deliberately no
+# GAMMA1 counterpart here: backward dead-ends stay zero-left origins, see ``_traverse``.
 
 
 def _resolve_type(types: tuple[str | None, ...]) -> str | None:

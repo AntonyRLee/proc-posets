@@ -2,6 +2,33 @@
 
 Dev tasks. Newest at top.
 
+## ✅ DONE — Output-sensitive `extract_signature` (kill the |B|×|F| product) (2026-07-20)
+
+**Context:** `extract_signature` (engine.py:182) emits one generator per `(P,S)`
+firing-choice context = `|B|×|F|` per activity. On a typed-merge OCPN a hub shared
+across `k` object types is **exponential in `k`** (Bundestag `Beratung` ⇒ ≈1.4×10³⁰
+generators; stage B never returns). Those all collapse onto the distinct-`CanonKey` count.
+
+**Shipped:** `cospan/engine_fast.py :: extract_signature_fast` — coupled-component
+decomposition (union-find on shared reachable type) + collapse to the CanonKey-relevant
+`(is_gamma2, type)`-multiset per component, then Cartesian product over type-disjoint
+components. Output-sensitive; byte-exact with the slow engine on the CanonKey set.
+
+- [x] `cospan/engine_fast.py` (`extract_signature_fast`), exported from `cospan/__init__.py`.
+- [x] `tests/regression/test_cpm_extract_fast.py` — fast CanonKeys == slow CanonKeys on
+      running-example / mixed-graph / surface-termini / typed-hub / OCPN-wrapper fixtures
+      (both `surface_termini`). 8 tests, green.
+- [x] Full suite: **335 passed, 20 skipped** (`extract_signature` untouched, no regressions).
+- [x] Opt-in wire: `from_ocpn.signature_from_ocpn(ocpn, *, canonical=…)` (default
+      `canonical=False` → slow/full; `True` → fast). Wrapper lives at the ocpn-dict layer
+      (OCEL→ocpn discovery stays in the consumer), not the plan's non-existent `discover.py`.
+- ⚠️ **The plan's "ready-to-drop-in" code was NOT byte-exact** — the cross-check caught two
+      bugs (no `surface=False` terminus strip; false type-independence under an *untyped*
+      choice node). Corrected algorithm shipped + documented. See the plan's Correction note.
+- **Plan + correction + evidence:** [`docs/2026-07-20-fast-signature-extraction.md`](docs/2026-07-20-fast-signature-extraction.md).
+- Still open there: 8 further optimisations (adjacency index, `_traverse` memo,
+  arity-range collapse, faster `without_silent`, OCPN reduction, …) — **not** done here.
+
 ## Split Miner anomaly (parked from the geometry paper, 2026-07-18)
 
 **Context:** In the geometry paper's Synthea fleet exhibit (demo/12_synthea_fleet), Split Miner is the

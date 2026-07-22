@@ -61,13 +61,17 @@ class CompositeDiagram:
     def labels(self) -> tuple[str, ...]:
         return tuple(p.label for p in self.placements)
 
-    def canonical_key(self) -> tuple[str, ...]:
-        """Order-independent identity for this composite: concurrent
-        (AND-branch) generators have no fixed order in a string diagram, only
-        sequential ones do -- ``compose_signature`` already dedupes
-        interleavings of the same generator set down to one representative
-        ordering, so two composites differing only in *which* interleaving
-        survived that dedup are the same diagram and must compare equal."""
+    def label_multiset_key(self) -> tuple[str, ...]:
+        """Order-independent identity for this composite: its sorted label multiset.
+
+        Concurrent (AND-branch) generators have no fixed order in a string diagram,
+        only sequential ones do -- ``compose_signature`` already dedupes interleavings
+        of the same generator set down to one representative ordering, so two
+        composites differing only in *which* interleaving survived that dedup are the
+        same diagram and must compare equal. Renamed from ``canonical_key`` to
+        disambiguate from the two unrelated key functions
+        :func:`procposets.cospan.occurrence.canonical_key` (the EventDag WL hash) and
+        :func:`procposets.cospan.signature_compare.canon_key` (the Generator key)."""
         return tuple(sorted(self.labels()))
 
 

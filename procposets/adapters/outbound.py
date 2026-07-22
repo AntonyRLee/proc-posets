@@ -27,10 +27,8 @@ import pm4py
 from pm4py.algo.evaluation.earth_mover_distance import algorithm as _emd
 
 from ..moddecomp import Leaf, Parallel, Series, decompose
-from ..poset import Poset
+from ..poset import Model
 from ..traces import trace_distribution
-
-Model = list[tuple[Poset, float]]
 
 
 def _tree_of(node):

@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 
 import networkx as nx
 
+from ._boundary import BOUNDARY_PREFIXES, GAMMA1, GAMMA2
 from .class_extraction import NamedMorphism, _to_counter
 from .morphism_schema import _expand, _frames
 from .signature import Port
@@ -60,10 +61,7 @@ OUT = "__OUT__"
 # ``GAMMA2`` sink, and any bare source/sink (a discovered OCPN's real first/last
 # activities) is attached to them -- so every notation renders one connected boundary.
 # (``IN``/``OUT`` remain the *loop-anchor* frontier sentinels, a different role.)
-# ASCII labels (the canonical-key WL hash encodes node labels as ASCII); the renderer
-# may prettify ``gamma1``/``gamma2`` to ``γ1``/``γ2`` for display.
-GAMMA1 = "gamma1"
-GAMMA2 = "gamma2"
+# ``GAMMA1``/``GAMMA2`` are imported from the dependency-free ``_boundary`` leaf.
 
 
 @dataclass
@@ -81,15 +79,15 @@ class EventDag:
         return [n for n, d in self.graph.nodes(data=True) if d["label"] not in (IN, OUT)]
 
 
-# ``BOUNDARY_PREFIXES`` is the OCCN per-type origin/terminus wrappers, shared with the
-# splice-site/skeleton logic (``splice._is_wrapper_label``, ``signature_diff``) -- it must
-# stay START_/END_ only, or those coordinate systems shift.
-BOUNDARY_PREFIXES = ("START_", "END_")
+# ``BOUNDARY_PREFIXES`` (the OCCN per-type origin/terminus wrappers) is imported from the
+# ``_boundary`` leaf; it is shared with the splice-site/skeleton logic
+# (``splice._is_wrapper_label``, ``signature_diff``) and must stay START_/END_ only, or
+# those coordinate systems shift.
 # ``to_event_dag`` additionally contracts the explicit ``gamma1``/``gamma2`` origin/terminus
 # (exact match) some logs carry as events, so every notation's *occurrence DAG* renders one
 # connected γ1 source / γ2 sink (§40). This is a render/canonical-key concern only; it does
 # NOT touch the splice spine. Pass ``strip_prefixes=()`` for the raw DAG (no contraction).
-DAG_BOUNDARY_MARKERS = ("START_", "END_", "gamma1", "gamma2")
+DAG_BOUNDARY_MARKERS = BOUNDARY_PREFIXES + (GAMMA1, GAMMA2)
 
 
 def _typ_str(typ: str | None) -> str:
@@ -180,6 +178,15 @@ def to_event_dag(
         for src in producers:
             wires.setdefault((src, OUT), []).append(p.typ)
 
+    return _assemble_event_dag(wires, labels, strip_prefixes, nm.name)
+
+
+def _assemble_event_dag(wires: dict, labels: dict, strip_prefixes: tuple,
+                        name: str) -> EventDag:
+    """Build the ``EventDag`` from the replayed ``wires`` (typed arcs per ordered
+    node pair) and ``labels``: one typed edge per pair (dropping bare
+    anchor->anchor and boundary-internal self-loop wires), reattach any bare
+    source/sink to the single γ1/γ2 boundary, then drop unused sentinels."""
     g = nx.DiGraph()
     for sentinel in (IN, OUT, GAMMA1, GAMMA2):
         g.add_node(sentinel, label=sentinel)
@@ -215,7 +222,7 @@ def to_event_dag(
         if g.degree(b) == 0:
             g.remove_node(b)
 
-    return EventDag(graph=g, name=nm.name)
+    return EventDag(graph=g, name=name)
 
 
 def loop_cycle_dag(nm: NamedMorphism, by_name: dict[str, NamedMorphism]) -> EventDag:

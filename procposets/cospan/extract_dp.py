@@ -219,17 +219,6 @@ def _tarjan_scc(graph: _Graph) -> dict[State, int]:
     return scc_of
 
 
-def _nontrivial_sccs(graph: _Graph, scc_of: dict[State, int]) -> set[int]:
-    """SCC ids that actually contain a cycle (size>1, or a self-loop)."""
-    size: Counter = Counter(scc_of.values())
-    nontrivial = {sid for sid, n in size.items() if n > 1}
-    for s, edges in graph.succ.items():
-        for _, ns in edges:
-            if ns == s:
-                nontrivial.add(scc_of[s])
-    return nontrivial
-
-
 def extract_classes(
     sig: Signature, *, max_frontiers: int = 200_000, max_pomsets_per_state: int = 512,
     one_origin: bool = False,
@@ -292,6 +281,7 @@ def extract_classes(
     path_gens: list = []
     path_index: dict[State, int] = {}  # state -> position on path (O(1) back-edge)
     scc_path: dict[int, frozenset] = {}  # scc-id -> frozenset of path states in it
+    truncated = [False]  # mutable flag: set True iff any state hits max_pomsets_per_state
 
     def closing_pomsets(state: State) -> list[tuple]:
         """Iso-classes of loop-free pomsets from ``state`` to a closed state.
@@ -333,6 +323,11 @@ def extract_classes(
                 entry = (wl, dag, body)
                 bucket.setdefault(wl, []).append(entry)
                 reps.append(entry)
+                if len(reps) >= max_pomsets_per_state:  # over-generation guard (§22): cap the
+                    truncated[0] = True                  # loop-free closings kept per frontier
+                    break                                # state; well-formed models stay far under
+            if truncated[0]:
+                break
         path.pop()
         path_gens.pop()
         del path_index[state]
@@ -351,5 +346,6 @@ def extract_classes(
             valid |= _flatten_generators(nm.body, fragments)
 
     return ExtractionResult(
-        fragments=fragments, valid_generators=valid, frontiers_visited=len(graph.states)
+        fragments=fragments, valid_generators=valid, frontiers_visited=len(graph.states),
+        truncated=truncated[0],
     )

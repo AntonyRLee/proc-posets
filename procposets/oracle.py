@@ -64,6 +64,7 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ._numerics import _log_mean_exp_rows
 from .likelihood import Atom, GroupedLog, TimedGroupedLog, make_atom
 from .rel import (
     IdealBudgetExceeded,
@@ -75,23 +76,12 @@ from .rel import (
 )
 
 
-def _log_mean_exp_rows(ratios: np.ndarray) -> np.ndarray:
-    """Per-row log((1/G) sum_g exp(ratios[., g])), with all-(-inf) rows
-    mapping to -inf instead of NaN."""
-    G = ratios.shape[1]
-    hi = ratios.max(axis=1)
-    out = np.full(ratios.shape[0], -np.inf)
-    ok = np.isfinite(hi)
-    if ok.any():
-        out[ok] = (
-            hi[ok]
-            + np.log(np.exp(ratios[ok] - hi[ok, None]).sum(axis=1))
-            - np.log(G)
-        )
-    return out
-
-
 class Oracle:
+    """The Frank-Wolfe pricing oracle: assemble the candidate-atom set (the regime
+    is chosen automatically -- enumeration / meet-closure / heuristic lattice, see
+    the module docstring) and price each atom's likelihood-gradient score against
+    the current mixture density (:meth:`price`)."""
+
     def __init__(
         self,
         log: GroupedLog,
@@ -136,6 +126,17 @@ class Oracle:
                 "(no mechanistic timed kernel is declared yet; see ROADMAP)"
             )
 
+        rels = self._select_candidates(cls, timed, max_exact_m, closure_cap, force_regime)
+        self._build_atoms(rels, els, cls)
+
+    # ------------------------------------------------------------------ #
+
+    def _select_candidates(self, cls, timed: bool, max_exact_m: int,
+                           closure_cap: int, force_regime: Optional[str]) -> List[Rel]:
+        """Regime dispatch: choose the candidate relation set, and set
+        ``self.kind`` / ``self.exact`` (enumeration and meet-closure are exact,
+        lattice-heuristic is not)."""
+        log = self.log
         if force_regime == "lattice-heuristic":
             rels = self._lattice_candidates()
             self.kind = "lattice-heuristic"
@@ -143,7 +144,7 @@ class Oracle:
             rels = cls.enumerate(log.alphabet)
             self.kind = "enumeration"
         elif (cls.contains_all_posets and cls.closed_under_meet
-              and noise_kernel == "uniform" and not timed):
+              and self.noise_kernel == "uniform" and not timed):
             # capability-flag dispatch: the reduction theorem needs a class
             # that contains every poset and is closed under meet -- declared
             # on the class, not encoded as pointer identity (W18)
@@ -156,23 +157,28 @@ class Oracle:
             rels = self._lattice_candidates()
             self.kind = "lattice-heuristic"
         self.exact = self.kind in ("enumeration", "meet-closure")
+        return rels
 
-        # build atoms and precompute the (atoms x groups) log-density matrix
+    def _build_atoms(self, rels: Iterable[Rel], els, cls) -> None:
+        """Build the atom list (each candidate poset crossed with the (eps, eta,
+        lam) nuisance grid) and precompute the ``(atoms x groups)`` log-density
+        matrix ``self.logF``.  A candidate too wide for exact e(P) is skipped and
+        downgrades a meet-closure certificate to heuristic."""
+        log = self.log
         self.atoms: List[Atom] = []
         self.budget_skipped = 0
-        inL_cache = {}
+        in_L_cache = {}
         for rel in rels:
             try:
                 a0 = make_atom(els, rel, 0.0, 0.0, poset_class=cls)
             except IdealBudgetExceeded:
-                # candidate too wide for exact e(P) on the declared budget:
-                # skipped, and the certificate is downgraded loudly below
-                # rather than hanging the DP (W12.1)
+                # too wide for exact e(P) on the declared budget: skipped, and the
+                # certificate is downgraded loudly below rather than hanging (W12.1)
                 self.budget_skipped += 1
                 continue
             if a0 is None:
                 continue  # outside the declared class (SP only): skipped by design
-            inL_cache[rel] = log.in_L(rel)
+            in_L_cache[rel] = log.in_L(rel)
             for eps in self.eps_grid:
                 for eta in self.eta_grid:
                     for lam in self.lam_grid:
@@ -183,7 +189,7 @@ class Oracle:
                         # a stale "uniform" tag
                         self.atoms.append(
                             Atom(rel=rel, e=a0.e, eps=eps, eta=eta,
-                                 noise=self.noise_kernel,
+                                 noise_kernel=self.noise_kernel,
                                  desc=a0.desc, lam=lam)
                         )
         if self.budget_skipped and self.kind == "meet-closure":
@@ -192,7 +198,7 @@ class Oracle:
             self.kind = "lattice-heuristic"
             self.exact = False
         self.logF = np.stack(
-            [log.group_logf(a, inL_cache[a.rel]) for a in self.atoms]
+            [log.group_logf(a, in_L_cache[a.rel]) for a in self.atoms]
         )  # (A, G)
 
     # ------------------------------------------------------------------ #

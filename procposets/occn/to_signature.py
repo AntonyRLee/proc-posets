@@ -1,7 +1,7 @@
 """OCCN -> cospan generator Signature (the deferred D1 adapter).
 
 Maps a mined :class:`markers.OCCN` into the repo's
-``cpm.cospan.signature.Signature`` (the same datatype the PN/PT/BPMN/CN
+``procposets.cospan.signature.Signature`` (the same datatype the PN/PT/BPMN/CN
 pipeline produces), so OCCN joins the cross-notation comparison.
 
 Construction (matches the paper's §4 OCCN -> cospan and ``RUNNING_EXAMPLE.md``):
@@ -30,57 +30,8 @@ from collections import defaultdict
 
 from ..cospan.constraints import constraint, cset, interval
 from ..cospan.signature import Generator, Port, Signature
+from ._lift import _boundary_generators, _in_port, _out_port, _type_balanced
 from .markers import OCCN, MarkerGroup
-
-
-def _types(group: MarkerGroup) -> frozenset[str]:
-    return frozenset(m.otype for m in group)
-
-
-def _type_balanced(ig: MarkerGroup, og: MarkerGroup) -> bool:
-    """Interior activities preserve object types -> same type set both sides.
-    A missing input or output side (a source/sink context) is unconstrained."""
-    if not ig or not og:
-        return True
-    return _types(ig) == _types(og)
-
-
-def _boundary_generators(occn: OCCN) -> set[Generator]:
-    """Generators for the synthetic ``START_<ot>``/``END_<ot>`` nodes.
-
-    Activities' own marker groups already reference these nodes (e.g.
-    ``gamma1``'s input markers include ``(START_img, img, ...)`` whenever
-    ``gamma1`` is the first ``img``-typed event in a trace, via the
-    ``fhm.py`` START/END fallback) -- but ``START_<ot>``/``END_<ot>`` are
-    never themselves keys of ``input_groups``/``output_groups`` (they're
-    not real OCEL events), so the main loop below never emits a generator
-    for them, leaving every activity downstream of a start unreachable from
-    the empty frontier. One generator per outgoing/incoming arc, not one
-    combined generator per type: ``START_<ot>`` may have several possible
-    first activities across different traces, and those are alternatives
-    (an object starts at exactly one of them), not a simultaneous bundle --
-    mirrors how real activities get one generator per alternative marker
-    group, never one generator unioning every alternative's ports.
-    """
-    gens: set[Generator] = set()
-    ocdg = occn.ocdg
-    for otype, start_node in ocdg.starts.items():
-        for src, ot, tgt in ocdg.arcs:
-            if src == start_node and ot == otype:
-                gens.add(Generator(start_node, frozenset(), frozenset({Port(start_node, otype, tgt)})))
-    for otype, end_node in ocdg.ends.items():
-        for src, ot, tgt in ocdg.arcs:
-            if tgt == end_node and ot == otype:
-                gens.add(Generator(end_node, frozenset({Port(src, otype, end_node)}), frozenset()))
-    return gens
-
-
-def _in_port(t: str, m) -> Port:
-    return Port(m.activity, m.otype, t)
-
-
-def _out_port(t: str, m) -> Port:
-    return Port(t, m.otype, m.activity)
 
 
 def _leg_constraints(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
@@ -100,7 +51,7 @@ def _leg_constraints(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
     parameterised by its own legs (the "blueprint"): the input interval and the
     mirror output interval describe *different* per-firing quantities and live on
     *different* generators. They are only reconciled when the cospans are composed --
-    :func:`cpm.cospan.constraints.union` intersects the shared ``Port`` identity,
+    :func:`procposets.cospan.constraints.union` intersects the shared ``Port`` identity,
     which **is** the pushout. A convergent wire whose producer per-firing fan-out and
     consumer per-firing intake disagree is therefore pruned (or grows node
     multiplicity, §36) *at composition/grounding*, not pre-resolved here. Earlier this
@@ -140,7 +91,7 @@ def occn_to_signature(occn: OCCN, *, bindings: bool = True) -> Signature:
     interval, each shared-key distribution as a partition equality. Pass
     ``bindings=False`` for the **plain** signature -- every leg ``1-1`` and no key
     constraints -- i.e. the forgetful typed-causal-net reading (the CLI default; see
-    :mod:`cpm.signature_cli`)."""
+    the consumer's ``cpm.signature_cli``)."""
     gens: set[Generator] = set()
     activities = set(occn.input_groups) | set(occn.output_groups)
     for t in activities:

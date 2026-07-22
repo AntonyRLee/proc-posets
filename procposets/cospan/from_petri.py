@@ -23,6 +23,7 @@ the paper.
 
 from __future__ import annotations
 
+from ._lmgraph_build import _assemble, _assemble_single, _type_prefix
 from .lmgraph import Kind, LMGraph
 
 
@@ -32,7 +33,7 @@ def add_petri(g: LMGraph, net, otype: str | None) -> None:
     Places and silent transitions are namespaced by ``otype`` (kept distinct
     across types); labelled transitions are shared by label.
     """
-    pre = f"{otype}__" if otype is not None else ""
+    pre = _type_prefix(otype)
 
     def place_id(p) -> str:
         return f"{pre}P_{p.name}"
@@ -61,16 +62,9 @@ def add_petri(g: LMGraph, net, otype: str | None) -> None:
 
 def lmgraph_from_petri_nets(nets_by_type: dict) -> LMGraph:
     """Build one typed object-centric LM-graph from ``{otype: PetriNet}``."""
-    g = LMGraph()
-    for otype, net in nets_by_type.items():
-        add_petri(g, net, otype)
-    g.validate()
-    return g
+    return _assemble(add_petri, nets_by_type)
 
 
 def lmgraph_from_petri(net, otype: str | None = None) -> LMGraph:
     """Single (optionally untyped) Petri net -> LM-graph."""
-    g = LMGraph()
-    add_petri(g, net, otype)
-    g.validate()
-    return g
+    return _assemble_single(add_petri, net, otype)

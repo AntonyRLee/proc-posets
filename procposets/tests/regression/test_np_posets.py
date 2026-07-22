@@ -29,7 +29,7 @@ from procposets import (
     parallel,
     rel_from_trace,
     respects,
-    sample_extension,
+    sample_extension_tree,
     sample_linear_extension,
     series,
     transitive_reduction,
@@ -238,7 +238,7 @@ def test_sample_extension_uniform_on_sp_tree():
     n = 6000
     counts = {e: 0 for e in exts}
     for _ in range(n):
-        t = sample_extension(tree, rng)
+        t = sample_extension_tree(tree, rng)
         assert respects(t, rel)
         counts[t] += 1
     assert set(counts) == set(exts)
@@ -249,7 +249,7 @@ def test_sample_extension_series_tree_is_deterministic():
     tree = series("a", "b", "c")
     rng = random.Random(3)
     for _ in range(10):
-        assert sample_extension(tree, rng) == ("a", "b", "c")
+        assert sample_extension_tree(tree, rng) == ("a", "b", "c")
 
 
 # ---------------------------------------------------------------------------

@@ -50,6 +50,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ._extensions import preds as _preds
 from .rel import (
     GENERAL,
     Rel,
@@ -83,12 +84,14 @@ class Atom:
     e: int          # extension count e(P)
     eps: float
     eta: float
-    noise: str = "uniform"
+    noise_kernel: str = "uniform"
     desc: str = ""  # human-readable form of rel (SP tree string or Hasse covers)
     lam: float = 1.0  # completion rate for timed traces (ignored on untimed logs)
 
     def describe(self) -> str:
-        tag = "" if self.noise == "uniform" else f", noise={self.noise}"
+        # the printed token stays ``noise=`` (byte-pinned in the consumer demo golden);
+        # only the attribute it reads was renamed noise -> noise_kernel.
+        tag = "" if self.noise_kernel == "uniform" else f", noise={self.noise_kernel}"
         tag += "" if self.lam == 1.0 else f", lam={self.lam:g}"
         return f"{self.desc}  [e={self.e}, eps={self.eps:g}, eta={self.eta:g}{tag}]"
 
@@ -178,29 +181,29 @@ class GroupedLog:
             self._n1_cache[rel] = (ind, max(len(n1), 1))
         return self._n1_cache[rel]
 
-    def trace_p(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def trace_p(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         """Per-distinct-trace probability under atom (with eps and eta mixed in)."""
-        if inL is None:
-            inL = self.in_L(atom.rel)
+        if in_L is None:
+            in_L = self.in_L(atom.rel)
         if atom.eps == 0.0:
             contamination = 0.0  # kernel is density-neutral at eps = 0:
             #                      skip it (avoids the N1 enumeration)
-        elif atom.noise == "swap":
+        elif atom.noise_kernel == "swap":
             n1_ind, n1_size = self.swap_kernel(atom.rel)
             contamination = n1_ind / n1_size
-        elif atom.noise == "uniform":
+        elif atom.noise_kernel == "uniform":
             contamination = 1.0 / self.m_fact
         else:
             raise ValueError(
-                f"unknown noise kernel {atom.noise!r}: the declared kernels "
+                f"unknown noise kernel {atom.noise_kernel!r}: the declared kernels "
                 f"are 'uniform' and 'swap'"
             )
-        clean = (1.0 - atom.eps) * inL / atom.e + atom.eps * contamination
+        clean = (1.0 - atom.eps) * in_L / atom.e + atom.eps * contamination
         return (1.0 - atom.eta) * clean + atom.eta * self.pbar
 
-    def group_logf(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def group_logf(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         """Vector over groups: log f_theta(g)."""
-        p = self.trace_p(atom, inL)
+        p = self.trace_p(atom, in_L)
         with np.errstate(divide="ignore"):
             logp = np.log(p)
         out = self.counts @ np.where(np.isfinite(logp), logp, -1e30)
@@ -217,7 +220,7 @@ def make_atom(
     rel: Rel,
     eps: float,
     eta: float,
-    noise: str = "uniform",
+    noise_kernel: str = "uniform",
     poset_class=GENERAL,
     lam: float = 1.0,
 ) -> Optional[Atom]:
@@ -238,7 +241,7 @@ def make_atom(
         e=cls.extension_count(elements, rel),
         eps=eps,
         eta=eta,
-        noise=noise,
+        noise_kernel=noise_kernel,
         desc=describe(elements, rel),
         lam=lam,
     )
@@ -306,7 +309,7 @@ class TimedGroupedLog(GroupedLog):
     def _k_vectors(self, rel: Rel) -> List[np.ndarray]:
         """Per distinct ordinal trace: the vector of enabled-counts k_j."""
         if rel not in self._k_cache:
-            preds = {e: {a for (a, b) in rel if b == e} for e in self.alphabet}
+            preds = _preds(self.alphabet, rel)  # {e: frozenset(predecessors)}
             out = []
             for t in self.traces:
                 rem = set(t)
@@ -318,15 +321,15 @@ class TimedGroupedLog(GroupedLog):
             self._k_cache[rel] = out
         return self._k_cache[rel]
 
-    def group_logf(self, atom: Atom, inL: np.ndarray | None = None) -> np.ndarray:
+    def group_logf(self, atom: Atom, in_L: np.ndarray | None = None) -> np.ndarray:
         # Evaluated entirely in log space: the previous linear-space form
         # (lam**m, exp(-lam <k, gaps>)) overflowed for large m log(lam) and
         # underflowed to an exact 0.0 -- hence a spurious -inf group density
         # -- for lam <k, gaps> beyond ~745 (DESIGN_REVIEW W6).
-        if atom.noise == "swap":
+        if atom.noise_kernel == "swap":
             raise ValueError("timed traces support only the uniform eps kernel")
-        if inL is None:
-            inL = self.in_L(atom.rel)
+        if in_L is None:
+            in_L = self.in_L(atom.rel)
         ks = self._k_vectors(atom.rel)
         lam, lbar, m = atom.lam, self.pooled_rate, self.m
         neg_inf = float("-inf")
@@ -350,7 +353,7 @@ class TimedGroupedLog(GroupedLog):
                     log_w_eps + log_gbar,
                     log_eta + ln0(self.pbar[ti]) + log_gbar,
                 ]
-                if inL[ti]:
+                if in_L[ti]:
                     terms.append(
                         log_w_clean + log_lam_m - lam * float(np.dot(ks[ti], gaps))
                     )

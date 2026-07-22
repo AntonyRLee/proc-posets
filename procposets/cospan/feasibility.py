@@ -1,6 +1,6 @@
 """Integer feasibility for leg-multiplicity constraint systems (§32).
 
-Given a set of :class:`~cpm.cospan.signature.LinearConstraint` over leg variables
+Given a set of :class:`~procposets.cospan.signature.LinearConstraint` over leg variables
 ``n_p`` (one per leg port), decide whether a satisfying non-negative integer
 assignment exists, exhibit a witness, and report each variable's feasible range.
 
@@ -62,6 +62,32 @@ def _unary_domain(var: Port, constraints: list[LinearConstraint], lo: int, bound
     return range(low, high + 1)  # empty iff low > high
 
 
+def _enumerate(cons, *, bound, lo, pinned, max_assignments):
+    """Yield each satisfying integer assignment ``{port: n}`` in the bounded box.
+
+    The single home for the enumeration prologue that ``solve`` / ``all_solutions``
+    / ``ranges`` each spelled out: the same unary-tightened domain build, the same
+    ``FeasibilityTooLarge`` size guard, the same ``itertools.product`` order and the
+    same ``_satisfied`` filter -- only the *accumulation* over the yielded
+    assignments differs between the callers."""
+    pinned = dict(pinned or {})
+    free = sorted(variables(cons) - set(pinned), key=str)
+    domains = [_unary_domain(v, cons, lo, bound) for v in free]
+    size = 1
+    for d in domains:
+        size *= len(d)
+        if size > max_assignments:
+            raise FeasibilityTooLarge(
+                f"{size}+ assignments over {len(free)} vars at bound {bound}; "
+                "raise max_assignments, lower the bound, or pass an ILP solver (§34)"
+            )
+    for combo in itertools.product(*domains):
+        assign = dict(pinned)
+        assign.update(zip(free, combo))
+        if all(_satisfied(c, assign) for c in cons):
+            yield assign
+
+
 def solve(
     constraints: Iterable[LinearConstraint],
     *,
@@ -78,24 +104,10 @@ def solve(
     cons = list(constraints)
     if solver is not None:
         return solver(cons, bound=bound, lo=lo, pinned=dict(pinned or {}))
-
-    pinned = dict(pinned or {})
-    free = sorted(variables(cons) - set(pinned), key=str)
-    domains = [_unary_domain(v, cons, lo, bound) for v in free]
-    size = 1
-    for d in domains:
-        size *= len(d)
-        if size > max_assignments:
-            raise FeasibilityTooLarge(
-                f"{size}+ assignments over {len(free)} vars at bound {bound}; "
-                "raise max_assignments, lower bound, or pass an ILP solver (§34)"
-            )
-    for combo in itertools.product(*domains):
-        assign = dict(pinned)
-        assign.update(zip(free, combo))
-        if all(_satisfied(c, assign) for c in cons):
-            return assign
-    return None
+    return next(
+        _enumerate(cons, bound=bound, lo=lo, pinned=pinned, max_assignments=max_assignments),
+        None,
+    )
 
 
 def feasible(constraints: Iterable[LinearConstraint], **kw) -> bool:
@@ -119,24 +131,9 @@ def all_solutions(
     Legs mentioned by no constraint are not variables -- they stay at their default
     count 1 and are simply absent from the returned dicts. Bounded-enumeration only;
     raises :class:`FeasibilityTooLarge` past ``max_assignments``."""
-    cons = list(constraints)
-    pinned = dict(pinned or {})
-    free = sorted(variables(cons) - set(pinned), key=str)
-    domains = [_unary_domain(v, cons, lo, bound) for v in free]
-    size = 1
-    for d in domains:
-        size *= len(d)
-        if size > max_assignments:
-            raise FeasibilityTooLarge(
-                f"{size}+ assignments; raise max_assignments or use an ILP solver (§34)"
-            )
-    out: list[dict] = []
-    for combo in itertools.product(*domains):
-        assign = dict(pinned)
-        assign.update(zip(free, combo))
-        if all(_satisfied(c, assign) for c in cons):
-            out.append(assign)
-    return out
+    return list(_enumerate(
+        list(constraints), bound=bound, lo=lo, pinned=pinned, max_assignments=max_assignments,
+    ))
 
 
 def ranges(
@@ -146,21 +143,11 @@ def ranges(
     """Per-variable ``(min, max)`` over all feasible assignments in the box -- the
     valid integer range of each leg multiplicity. ``{}`` if the system is
     infeasible. Bounded-enumeration backend only."""
-    cons = list(constraints)
-    pinned = dict(pinned or {})
-    free = sorted(variables(cons) - set(pinned), key=str)
-    domains = [_unary_domain(v, cons, lo, bound) for v in free]
-    size = 1
-    for d in domains:
-        size *= len(d)
-        if size > max_assignments:
-            raise FeasibilityTooLarge(f"{size}+ assignments; raise max_assignments or use an ILP solver (§34)")
     out: dict[Port, tuple[int, int]] = {}
-    for combo in itertools.product(*domains):
-        assign = dict(pinned)
-        assign.update(zip(free, combo))
-        if all(_satisfied(c, assign) for c in cons):
-            for p, n in assign.items():
-                lo_p, hi_p = out.get(p, (n, n))
-                out[p] = (min(lo_p, n), max(hi_p, n))
+    for assign in _enumerate(
+        list(constraints), bound=bound, lo=lo, pinned=pinned, max_assignments=max_assignments,
+    ):
+        for p, n in assign.items():
+            lo_p, hi_p = out.get(p, (n, n))
+            out[p] = (min(lo_p, n), max(hi_p, n))
     return out

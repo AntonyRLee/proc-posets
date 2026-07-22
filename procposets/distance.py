@@ -10,11 +10,12 @@ The contrast between the two on the same pair of models is the point of the sand
 from __future__ import annotations
 
 import math
+from typing import Literal, Optional
 
 from .matrix import END, START, build, normal_form_distribution
-from .poset import Poset
+from .poset import Model
 
-Model = list[tuple[Poset, float]]
+Mode = Literal["sink", "selfloop"]  # matrix-normalisation on the common state space
 
 # Matrix normalisation on the common state space (docs/DESIGN-comparison-object.md, TODO §8):
 #   "selfloop" (option 1) -- unused state s -> s; END -> END (absorbing). Distance-paper convention.
@@ -37,11 +38,48 @@ def _augment(matrix, states, mode=None):
     return out
 
 
-def _bc(row1: dict[str, float], row2: dict[str, float], states: list[str]) -> float:
-    return sum(math.sqrt(row1.get(s, 0.0) * row2.get(s, 0.0)) for s in states)
+def _bc(row1: dict[str, float], row2: dict[str, float], keys) -> float:
+    """Bhattacharyya coefficient of two rows over `keys` (in `keys` order)."""
+    return sum(math.sqrt(row1.get(k, 0.0) * row2.get(k, 0.0)) for k in keys)
 
 
-def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[float, dict[str, float]]:
+def _clamp01(x: float) -> float:
+    """Clamp a Bhattacharyya coefficient into [0, 1] (guards ``acos`` against fp drift)."""
+    return min(1.0, max(0.0, x))
+
+
+def _row_angle(row1: dict[str, float], row2: dict[str, float], keys) -> float:
+    """Per-row Bhattacharyya angle ``arccos(BC)`` -- the per-state SMD term. BC is
+    summed in `keys` order, so passing the same key sequence reproduces the exact
+    float accumulation of the open-coded form it replaces."""
+    return math.acos(_clamp01(_bc(row1, row2, keys)))
+
+
+def _row_angle_sparse(row1: dict[str, float], row2: dict[str, float], key_idx: dict) -> float:
+    """Sparse twin of :func:`_row_angle`, byte-identical in value over a large sorted
+    state space.  ``_bc`` walks all ``keys`` even though the augmented rows are sparse
+    (a block transitions to a handful of successors), so the dense form is O(|keys|)
+    per row -> O(|X|^2) overall.  Here BC is summed only over the keys present in BOTH
+    rows AND in ``keys`` (``key_idx`` maps each dense key to its position; build it once
+    per matrix comparison).  This is exact: the dropped terms are all ``sqrt(0*x)=0.0``
+    -- ``_bc`` already ignores any key not in ``keys`` -- and a running float sum starts
+    at 0 with ``x + 0.0 == x``, so ordering the retained terms by ``key_idx`` reproduces
+    ``_bc``'s exact accumulation.  (Note: NOT ``_pairwise_rows`` -- that path's
+    dict-insertion-order sum and equal-row skip are changes-values.)"""
+    common = set(row1).intersection(row2, key_idx)
+    bc = sum(math.sqrt(row1[k] * row2[k]) for k in sorted(common, key=key_idx.__getitem__))
+    return math.acos(_clamp01(bc))
+
+
+def _bhattacharyya_angle(p: dict[str, float], q: dict[str, float]) -> float:
+    """The single-vector Bhattacharyya angle ``2*arccos(BC)`` over ``set(p)|set(q)``
+    -- the Result-1 form shared by :func:`bhattacharyya_angle` and
+    :func:`traces.trace_bhattacharyya`."""
+    return 2.0 * math.acos(_clamp01(_bc(p, q, set(p) | set(q))))
+
+
+def smd_rows(built1, built2, mode: Optional[Mode] = None, normalize: bool = False,
+             states: Optional[list[str]] = None) -> tuple[float, dict[str, float]]:
     """SMD between two already-BUILT (matrix, states) pairs -- for reusing builds, or for
     comparing against a hand-built chain that no finite variant set produces (e.g. the cyclic
     loop limit of `spm.loops.loop_limit`).
@@ -66,19 +104,19 @@ def smd_rows(built1, built2, mode=None, normalize=False, states=None) -> tuple[f
     if states is None:
         states = sorted(set(s1) | set(s2))
     a1, a2 = _augment(m1, states, mode), _augment(m2, states, mode)
+    key_idx = {s: i for i, s in enumerate(states)}  # dense-key positions, built once
     total = 0.0
     per_block: dict[str, float] = {}
     for s in states:
-        bc = min(1.0, max(0.0, _bc(a1[s], a2[s], states)))
-        ang = math.acos(bc)
+        ang = _row_angle_sparse(a1[s], a2[s], key_idx)
         per_block[s] = ang
         total += ang * ang
     scale = 1.0 / math.sqrt(len(states)) if normalize else 1.0
     return 2.0 * math.sqrt(total) * scale, per_block
 
 
-def smd(model1: Model, model2: Model, mode=None, context_depth: int = 1,
-        normalize=False) -> tuple[float, dict[str, float]]:
+def smd(model1: Model, model2: Model, mode: Optional[Mode] = None, context_depth: int = 1,
+        normalize: bool = False) -> tuple[float, dict[str, float]]:
     """Stochastic-matrix distance (Result 3) + the per-state (per-block) angle breakdown
     (the diagnostic: which block drives the divergence). `mode` selects the normalisation
     ("sink" default, or "selfloop"); see NORMALISATION above. `context_depth` is the VLMC dial
@@ -104,15 +142,15 @@ def _pairwise_rows(rowmaps, states, normalize=False) -> list[list[float]]:
                     continue
                 if len(r2) < len(r1):
                     r1, r2 = r2, r1
-                bc = min(1.0, max(0.0, sum(math.sqrt(v * r2.get(t, 0.0)) for t, v in r1.items())))
+                bc = _clamp01(sum(math.sqrt(v * r2.get(t, 0.0)) for t, v in r1.items()))
                 ang = math.acos(bc)
                 total += ang * ang
             D[i][j] = D[j][i] = 2.0 * math.sqrt(total) * scale
     return D
 
 
-def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1,
-                 normalize=False) -> list[list[float]]:
+def smd_pairwise(models: list[Model], mode: Optional[Mode] = None, context_depth: int = 1,
+                 normalize: bool = False) -> list[list[float]]:
     """Pairwise SMD over a fleet of models, building each block matrix ONCE on the fleet-wide
     common state space X (the union over ALL models).
 
@@ -135,8 +173,6 @@ def smd_pairwise(models: list[Model], mode=None, context_depth: int = 1,
 
 def bhattacharyya_angle(model1: Model, model2: Model) -> float:
     """Result 1: Bhattacharyya angle between the flat normal-form distributions."""
-    p = normal_form_distribution(model1)
-    q = normal_form_distribution(model2)
-    support = set(p) | set(q)
-    bc = min(1.0, max(0.0, sum(math.sqrt(p.get(k, 0.0) * q.get(k, 0.0)) for k in support)))
-    return 2.0 * math.acos(bc)
+    return _bhattacharyya_angle(
+        normal_form_distribution(model1), normal_form_distribution(model2)
+    )

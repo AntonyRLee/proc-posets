@@ -29,9 +29,7 @@ from collections import Counter
 
 from .matrix import END, START, _block_sequence
 from .moddecomp import decompose
-from .poset import Poset, then
-
-Model = list[tuple[Poset, float]]
+from .poset import Model, Poset, then
 
 
 def truncated_geometric(q: float, K: int, tail: str = "renorm") -> list[float]:
