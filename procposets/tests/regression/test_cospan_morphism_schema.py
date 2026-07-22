@@ -1,5 +1,5 @@
-"""Tests for the post-search schema-recognition layer (``CLASS_EXTRACTION.md``
-§12, ``cpm/cospan/morphism_schema.py``).
+"""Tests for the post-search schema-recognition layer (``the class-extraction design``
+§12, ``procposets/cospan/morphism_schema.py``).
 
 Core claim under test: two fragment bodies are the "same schema" iff they
 agree on everything except *which external neighbour* a boundary wire is

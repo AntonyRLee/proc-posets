@@ -14,8 +14,8 @@ from procposets.cospan.from_ocpn import signature_from_ocpn
 from procposets.cospan.lmgraph import Kind, LMGraph
 from procposets.cospan.signature_compare import canon_key, canonical_generators
 
-from .test_cpm_engine_running_example import build_running_example
-from .test_cpm_surface_termini import _mixed_graph
+from .test_cospan_engine_running_example import build_running_example
+from .test_cospan_surface_termini import _mixed_graph
 
 
 # --- pm4py-free fakes for the OCPN wrapper (add_petri only duck-types the net:

@@ -1,4 +1,4 @@
-"""Tests for the splice representation (CLASS_EXTRACTION.md §27): the
+"""Tests for the splice representation (the class-extraction design, §27): the
 ``M(m,σ)`` family catalogue as concrete pomsets + algebraic skeletons, canonical
 and serializable."""
 

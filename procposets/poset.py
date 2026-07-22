@@ -80,6 +80,8 @@ def _fresh(p: Poset) -> Poset:
 
 
 def leaf(label: str) -> Poset:
+    """A single-element ``Poset`` carrying ``label`` -- the atom of the
+    ``then`` / ``par`` algebra."""
     e = next(_ids)
     return Poset([e], {e: label}, set())
 

@@ -129,6 +129,11 @@ def count_linear_extensions(elements, rel) -> int:
 
 
 def sample_linear_extension(elements, rel, rng):
+    """Uniformly sample one linear extension of the Rel-view poset ``(elements, rel)``.
+
+    Rel-view spelling of the sampler; delegates to the same guarded ideal-lattice
+    engine as :func:`count_linear_extensions` (raises :class:`IdealBudgetExceeded`
+    above ``MAX_IDEAL_STATES``)."""
     return _ext.sample_extension_poset(elements, rel, rng, max_states=MAX_IDEAL_STATES)
 
 

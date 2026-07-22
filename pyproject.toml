@@ -58,10 +58,6 @@ exclude = ["procposets/tests", "**/*.zip", "**/*.md"]
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 testpaths = ["procposets/tests"]
-markers = [
-  "graph: needs the [graph] extra (networkx)",
-  "pm4py: needs the [pm4py] extra",
-  "viz: needs the [viz] extra",
-]
-# inherited from the SIM repo: the networkx >=3.5 directed-graph WL-hash change is benign here
+# extra-gating is by capability in procposets/tests/regression/conftest.py
+# (find_spec on numpy/networkx), not marker-based, so no custom markers here.
 filterwarnings = ["ignore:The hashes produced for directed graphs changed:UserWarning"]

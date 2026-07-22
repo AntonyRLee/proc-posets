@@ -1,4 +1,4 @@
-"""Tests for procposets/posets.py.
+"""Tests for procposets/poset.py.
 
 Oracle strategy: brute force over itertools.permutations, OEIS counts
 (A001035 for labeled posets), analytic identities (Szpilrajn: every poset is

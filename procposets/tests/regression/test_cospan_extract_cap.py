@@ -14,7 +14,7 @@ this file on a numpy-only install.
 from procposets.cospan import extract_dp
 from procposets.cospan.engine import extract_signature
 
-from .test_cpm_engine_running_example import build_running_example
+from .test_cospan_engine_running_example import build_running_example
 
 _FULL_CLOSINGS = 12  # the running example's full loop-free closing catalogue
 
