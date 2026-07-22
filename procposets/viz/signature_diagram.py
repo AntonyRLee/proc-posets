@@ -15,9 +15,6 @@ matplotlib only (no graphviz binary needed).
 """
 from __future__ import annotations
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle, FancyBboxPatch

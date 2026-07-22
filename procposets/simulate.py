@@ -88,21 +88,29 @@ def sample_timed_grouped_log(
 
     rng = random.Random(seed)
     rels = [tree_relations(t) for t in mix.trees]
-    alphabet = sorted(mix.trees[0].elements())
+    # Ground alphabet PER COMPONENT.  NPMLE mixtures normally share one activity
+    # set (so every alphabets[k] is identical and this is byte-identical to the
+    # old single ``sorted(trees[0].elements())`` hoist), but TrueMixture does not
+    # enforce a common support and the untimed sampler ``sample_grouped_log``
+    # already samples each component over its OWN elements -- so key every
+    # component off its own tree rather than trees[0], instead of silently
+    # dropping (or spuriously enabling) activities for an odd-one-out component.
+    alphabets = [sorted(t.elements()) for t in mix.trees]
     # Hoist the per-component predecessor/successor indices out of one_timed
     # (it was rebuilding preds on each of its G*n_g calls); both are rng-free, so
     # the draw stream is untouched.  preds is transitively closed (tree_relations),
     # so preds[x] & rem empty <=> x is minimal in rem, and indeg[x] = |remaining
     # predecessors| lets the enabled frontier be maintained incrementally instead
     # of rescanned O(|rem|*deg) every step.
-    preds_by_k = [_preds(alphabet, rel) for rel in rels]
+    preds_by_k = [_preds(alphabets[k], rel) for k, rel in enumerate(rels)]
     succs_by_k = [
-        {x: [y for y in alphabet if x in preds[y]] for x in alphabet}
-        for preds in preds_by_k
+        {x: [y for y in alphabets[k] if x in preds[y]] for x in alphabets[k]}
+        for k, preds in enumerate(preds_by_k)
     ]
 
     def one_timed(k: int) -> Tuple[Tuple[str, ...], Tuple[float, ...]]:
         preds, succs, lam = preds_by_k[k], succs_by_k[k], lams[k]
+        alphabet = alphabets[k]
         rem = set(alphabet)
         indeg = {x: len(preds[x]) for x in alphabet}  # rem = full alphabet initially
         enabled = sorted(x for x in alphabet if indeg[x] == 0)  # minimal elements

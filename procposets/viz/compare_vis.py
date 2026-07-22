@@ -11,11 +11,8 @@ many are passed.
 
 from __future__ import annotations
 
-import matplotlib
-
-matplotlib.use("Agg")  # headless
-import matplotlib.patches as mpatches  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 
 from ..cospan.signature_compare import ComparisonReport  # noqa: E402
 
