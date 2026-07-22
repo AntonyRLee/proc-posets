@@ -1472,7 +1472,7 @@ wheels = [
 ]
 
 [[package]]
-name = "procposets"
+name = "proc-posets"
 source = { editable = "." }
 
 [package.optional-dependencies]

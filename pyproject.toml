@@ -1,5 +1,5 @@
 [project]
-name = "procposets"
+name = "proc-posets"
 dynamic = ["version"]  # single-sourced from procposets/__init__.py:__version__
 description = "Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research."
 readme = "README.md"
@@ -40,7 +40,7 @@ estimate = ["numpy>=1.24"]                                   # Layer A1 (numpy):
 graph    = ["networkx>=3.1"]                                 # Layer B1: occurrence / splice / trace-language / DP extraction
 pm4py    = ["pm4py>=2.7.22.5", "pandas>=2.0", "networkx>=3.1"]  # Layer B2: model adapters (implies the graph paths)
 viz      = ["matplotlib>=3.8", "graphviz>=0.21", "numpy>=1.24"] # Layer C: renderers (string_diagram/spm_viz use numpy; dag_render needs the `dot` binary)
-all      = ["procposets[estimate,graph,pm4py,viz]"]
+all      = ["proc-posets[estimate,graph,pm4py,viz]"]
 
 [dependency-groups]
 # the package's own suite exercises every layer, so dev pulls numpy + matplotlib;

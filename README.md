@@ -1,4 +1,4 @@
-# procposets
+# proc-posets
 
 Reusable **poset / cospan / string-diagram** calculation, simulation,
 estimation and comparison core for process-mining research — the shared
@@ -88,20 +88,20 @@ as an editable uv path-dependency (it is not published to PyPI), so a
 consumer's `pyproject.toml` declares:
 
 ```toml
-dependencies = ["procposets"]                 # dependency-free core
-# or "procposets[estimate]" for the numpy NPMLE estimator, etc.
+dependencies = ["proc-posets"]                # dependency-free core
+# or "proc-posets[estimate]" for the numpy NPMLE estimator, etc.
 [tool.uv.sources]
-procposets = { path = "../procposets", editable = true }
+proc-posets = { path = "../proc-posets", editable = true }
 ```
 
 then `uv sync`. To add an extra to an existing uv project:
 
 ```
-uv add "procposets[estimate]"   # + numpy: the NPMLE estimator + M9 initialiser
-uv add "procposets[graph]"      # + networkx: occurrence nets, splice, DP class-extraction
-uv add "procposets[pm4py]"      # + pm4py model adapters (inbound/outbound)
-uv add "procposets[viz]"        # + matplotlib/graphviz renderers
-uv add "procposets[all]"
+uv add "proc-posets[estimate]"  # + numpy: the NPMLE estimator + M9 initialiser
+uv add "proc-posets[graph]"     # + networkx: occurrence nets, splice, DP class-extraction
+uv add "proc-posets[pm4py]"     # + pm4py model adapters (inbound/outbound)
+uv add "proc-posets[viz]"       # + matplotlib/graphviz renderers
+uv add "proc-posets[all]"
 ```
 
 - **A0 — pure stdlib:** canonical labelled `Poset` and its algebra (meet,

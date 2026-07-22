@@ -1,4 +1,4 @@
-# procposets — project instructions
+# proc-posets — project instructions
 
 Reusable poset / cospan / string-diagram calculation, simulation, estimation
 and comparison core, factored out of three research repos

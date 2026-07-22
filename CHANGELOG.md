@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **procposets** are documented here. The format follows
+All notable changes to **proc-posets** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -17,6 +17,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Quickstart in the README.
 
 ### Changed
+- Renamed the distribution from `procposets` to `proc-posets` to match the
+  repository name (`AntonyRLee/proc-posets`). The **import package is unchanged**:
+  `import procposets` still works — only the distribution name, the
+  `[tool.uv.sources]` key, and the repo directory change. Consumers using the
+  editable path source should update both the key and path to `proc-posets`.
 - Single-sourced four localized code duplications (`from_heuristics` LM-graph
   wrappers, the two signature extractors' shared preamble/tail, the OCEL
   simulators' column vocabulary + frame assembly, the OCPN discover→extract
