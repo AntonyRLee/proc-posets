@@ -10,7 +10,6 @@ import random
 import re
 from math import sqrt
 
-import pytest
 
 from procposets import (
     TrueMixture,

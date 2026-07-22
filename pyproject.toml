@@ -1,6 +1,6 @@
 [project]
 name = "procposets"
-version = "0.1.0"
+dynamic = ["version"]  # single-sourced from procposets/__init__.py:__version__
 description = "Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research."
 readme = "README.md"
 requires-python = ">=3.10"          # verified: no first-party source in any consumer repo uses >3.10 syntax
@@ -43,17 +43,33 @@ viz      = ["matplotlib>=3.8", "graphviz>=0.21", "numpy>=1.24"] # Layer C: rende
 all      = ["procposets[estimate,graph,pm4py,viz]"]
 
 [dependency-groups]
-# the package's own suite exercises every layer, so dev pulls numpy + matplotlib
-dev = ["pytest>=9.1.1", "numpy>=1.24", "matplotlib>=3.10.9"]
+# the package's own suite exercises every layer, so dev pulls numpy + matplotlib;
+# ruff + mypy back the shipped py.typed marker (see CI).
+dev = ["pytest>=9.1.1", "numpy>=1.24", "matplotlib>=3.10.9", "ruff>=0.6.0", "mypy>=1.10"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "procposets/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["procposets"]
 # The value-pinned golden corpus is dev-only; stray scratch must never ship.
 exclude = ["procposets/tests", "**/*.zip", "**/*.md"]
+
+[tool.hatch.build.targets.sdist]
+# Curated allowlist: the package + the user-facing docs/metadata only, so the
+# source distribution never bundles dev-session artifacts.
+include = [
+  "procposets/",
+  "README.md",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "LICENSE",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
@@ -61,3 +77,25 @@ testpaths = ["procposets/tests"]
 # extra-gating is by capability in procposets/tests/regression/conftest.py
 # (find_spec on numpy/networkx), not marker-based, so no custom markers here.
 filterwarnings = ["ignore:The hashes produced for directed graphs changed:UserWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Correctness-focused gate (pyflakes): unused imports/vars, undefined names,
+# f-string mistakes. Cosmetic style (line length, semicolons) is intentionally
+# not enforced -- the extracted code predates a formatter; tighten incrementally.
+select = ["F"]
+
+[tool.ruff.lint.per-file-ignores]
+# rel.py deliberately re-exports rel_sp / rel_classes names so that
+# `from procposets.rel import ...` and the package __init__ keep resolving;
+# those names are unused *within* rel.py by design.
+"procposets/rel.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true   # optional-extra libs (pm4py/networkx/...) aren't always present
+# Lenient baseline the just-extracted code satisfies; backs the py.typed marker
+# without blocking CI on a full strict pass (tighten over time).

@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from ..cospan.constraints import constraint, cset, interval
-from ..cospan.signature import Generator, Port, Signature
+from ..cospan.signature import Generator, Signature
 from ._lift import _boundary_generators, _in_port, _out_port, _type_balanced
 from .markers import OCCN, MarkerGroup
 

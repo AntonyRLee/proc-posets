@@ -5,6 +5,33 @@ estimation and comparison core for process-mining research — the shared
 library behind three research repos that previously duplicated and
 `sys.path`-shimmed each other's code.
 
+## Quickstart
+
+The core is pure standard library, so this runs on a bare `import procposets`
+(no extras):
+
+```python
+from procposets import leaf, then, par, modular_decompose, smd
+
+# A "model" is a weighted list of labelled posets (its variants).
+seq  = [(then(leaf("a"), leaf("b"), leaf("c")), 1.0)]        # a < b < c
+conc = [(then(leaf("a"), par(leaf("b"), leaf("c"))), 1.0)]   # a < (b ∥ c)
+
+# Canonical block tiling (the unique total modular decomposition):
+print(modular_decompose(then(leaf("a"), par(leaf("b"), leaf("c")))).canonical())
+# -> (a ; (b * c))
+
+# Stochastic-matrix distance between the two models (Result 3), and the
+# per-state angle breakdown:
+dist, per_state = smd(seq, conc, normalize=True)
+print(round(dist, 4))
+```
+
+Reach for `fit` / `GroupedLog` / `Oracle` and you're in the numpy-backed NPMLE
+estimator (the `[estimate]` extra), loaded lazily; the cospan / discovery /
+visualisation layers sit behind `[graph]` / `[pm4py]` / `[viz]` (see **Layers**
+below).
+
 ## Defaults and conventions (state space & the SMD)
 
 These are the conventions every comparison in this package uses, stated once
@@ -103,7 +130,13 @@ transitively-closed order, so it can represent **repeated labels**.
 
 ## Status
 
-Under extraction from `poset-mixture-npmle`, `-DIAGRAM-.../sim` (`cpm`), and
-`stochastic_process_mining` (`spm`). Each reconciliation seam is proven
-value-equivalent to the original before the original is deleted. See the
-consumer repos' `.claude/REFACTOR_DESIGN.md`.
+Standalone and stabilized. The reusable core was extracted from three research
+codebases (poset-mixture NPMLE, a string-diagram process-mining engine, and a
+stochastic-process-mining comparison sandbox), each seam reproduced
+**value-for-value** before the original was retired; that behaviour is now
+locked by the in-repo regression suite (`procposets/tests/regression/`, run
+with `uv run pytest`), which is self-contained (no sibling repo required).
+
+Released on its own track and not yet on PyPI — consumed today as an editable
+uv path dependency (see **Layers**). Versioning follows semantic versioning
+from the current `0.1.0`; see `CHANGELOG.md`.

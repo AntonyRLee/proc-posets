@@ -1,6 +1,6 @@
 """Repeated-label support: id-based constructor + v2 label-preserving-iso prime canonicalisation."""
 from procposets.moddecomp import Prime, decompose, tiling
-from procposets.poset import from_edges, leaf, par, then
+from procposets.poset import from_edges, leaf, par
 
 
 def test_from_edges_allows_repeated_labels():

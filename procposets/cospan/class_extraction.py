@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
-from .signature import Generator, Port, Signature
+from .signature import Generator, Port
 
 # A frontier's canonical, hashable form: a frozenset of (port, count) pairs
 # with all-positive counts (zero counts dropped). Using a multiset rather
