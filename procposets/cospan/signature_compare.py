@@ -135,7 +135,7 @@ def binding_profile(g: Generator) -> BindingProfile:
     """Extract :class:`BindingProfile` from one generator's §32 constraints.
 
     Single-leg unit-coefficient constraints are folded per leg into a ``(lo, hi)``
-    interval (mirroring the consumer viz's ``_leg_card_by_port``): ``>=``/``==`` raise ``lo``,
+    interval (per-leg cardinality bounds): ``>=``/``==`` raise ``lo``,
     ``<=``/``==`` lower ``hi``; a leg with none defaults to 1:1 and is dropped.
     Multi-leg constraints become :attr:`BindingProfile.relations`."""
     by_port: dict = {}  # Port -> [lo, hi]

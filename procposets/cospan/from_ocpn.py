@@ -6,8 +6,8 @@ share activity labels.  That is exactly the typed-merge structure
 :func:`procposets.cospan.from_petri.lmgraph_from_petri_nets` already consumes, so this
 adapter just extracts the per-type nets and reuses it.
 
-Distinction from the ``PN`` model class in the consumer's ``cpm.discover``: ``PN``
-*re-discovers* a per-type inductive Petri net on each flattened log, whereas this
+Distinction from a per-type *re-discovery* model: such a model *re-discovers*
+a per-type inductive Petri net on each flattened log, whereas this
 consumes the **discovered OCPN object itself** -- its silent transitions,
 variable (double) arcs and shared places included -- so the resulting signature
 is the algebraic presentation of the OCPN as discovered, not of a re-derivation.

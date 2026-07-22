@@ -1,4 +1,4 @@
-"""Component densities for the grouped poset-mixture model.
+"""Component densities for the grouped poset mixture model.
 
 Model
 -----
@@ -89,7 +89,7 @@ class Atom:
     lam: float = 1.0  # completion rate for timed traces (ignored on untimed logs)
 
     def describe(self) -> str:
-        # the printed token stays ``noise=`` (byte-pinned in the consumer demo golden);
+        # the printed token stays ``noise=`` (byte-pinned in a downstream golden);
         # only the attribute it reads was renamed noise -> noise_kernel.
         tag = "" if self.noise_kernel == "uniform" else f", noise={self.noise_kernel}"
         tag += "" if self.lam == 1.0 else f", lam={self.lam:g}"
@@ -114,8 +114,8 @@ class GroupedLog:
         # (the 1[t in L(P)] indicator, the 1/m! price, lam^m, one gap per
         # activity).  A trace that is not a permutation of the full alphabet
         # used to produce KeyErrors or silently wrong densities *with a
-        # clean certificate* (DESIGN_REVIEW W11); partial traces are a
-        # redesign, not an input (ROADMAP M5).
+        # clean certificate*; partial traces are a
+        # redesign, not an input.
         alpha_set = set(self.alphabet)
         for gi, g in enumerate(self.groups):
             for t in g:
@@ -325,7 +325,7 @@ class TimedGroupedLog(GroupedLog):
         # Evaluated entirely in log space: the previous linear-space form
         # (lam**m, exp(-lam <k, gaps>)) overflowed for large m log(lam) and
         # underflowed to an exact 0.0 -- hence a spurious -inf group density
-        # -- for lam <k, gaps> beyond ~745 (DESIGN_REVIEW W6).
+        # -- for lam <k, gaps> beyond ~745.
         if atom.noise_kernel == "swap":
             raise ValueError("timed traces support only the uniform eps kernel")
         if in_L is None:

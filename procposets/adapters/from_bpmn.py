@@ -1,6 +1,6 @@
 """Adapter: pm4py BPMNDiagram -> logic-mediated multipartite LM-graph.
 
-Direct, no detour through Petri nets. Per ``def:bpmn`` (digest, §6): every
+Direct, no detour through Petri nets. Per ``def:bpmn``: every
 flow object is either an activity ($\\ell$-value ``activity``) or a gateway
 ($\\ell$-value ``AND``/``XOR``/``OR``); there is no third "transparent" class.
 Start/end events and tasks are therefore all absorbing activities -- BPMN's

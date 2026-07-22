@@ -33,7 +33,7 @@ def _block_sequence(tree) -> list[str]:
 def build(model: list[tuple[Poset, float]], context_depth: int = 1):
     """Return (matrix, states). matrix[src] = {dst: prob}; states are order-`context_depth` block
     contexts ('|'-joined last <=k blocks) plus the bare sentinels START, END. context_depth=1 is
-    the memoryless block chain (default; identical matrices to the pre-VLMC sandbox)."""
+    the memoryless block chain (default; identical matrices to the pre-VLMC implementation)."""
     k = max(1, context_depth)
     raw: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     states: set[str] = {START, END}

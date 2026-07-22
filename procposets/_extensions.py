@@ -11,7 +11,7 @@ implementation, shared by both poset views:
 Both call these functions -- the element type is irrelevant, only the order
 *pairs* matter.  The guard (``MAX_IDEAL_STATES`` + the polynomial chain-cover
 precheck) is the only thing standing between the meet-closure oracle and an
-unbounded hang on a wide poset (DESIGN_REVIEW W12.1), so it travels *with* the
+unbounded hang on a wide poset, so it travels *with* the
 counter, not around it.
 """
 
@@ -22,8 +22,8 @@ from typing import Dict, FrozenSet, Iterable, List, Tuple
 # Hard ceiling on the ideal-lattice DP's state count.  The DP is exponential
 # only in poset width; the meet-closure oracle runs at *any* m, where meets of
 # a few long chains are typically wide -- without a guard this is the one
-# place the library can hang or exhaust memory with no printed verdict
-# (DESIGN_REVIEW W12.1).  The bound below is certified before recursing.
+# place the library can hang or exhaust memory with no printed verdict.
+# The bound below is certified before recursing.
 MAX_IDEAL_STATES = 1_000_000
 
 
@@ -115,7 +115,7 @@ def count_extensions(elements, pairs, max_states: int = MAX_IDEAL_STATES) -> int
     fewer; this is exact for every poset, with cost exponential only in the
     width.  A chain-cover bound on the ideal count is certified against
     ``max_states`` before recursing; a too-wide poset raises
-    IdealBudgetExceeded instead of hanging (DESIGN_REVIEW W12.1).
+    IdealBudgetExceeded instead of hanging.
     """
     check_ideal_budget(elements, pairs, max_states)
     pr = preds(elements, pairs)

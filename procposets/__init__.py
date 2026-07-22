@@ -1,8 +1,7 @@
 """procposets: reusable poset / cospan / string-diagram core.
 
-Extracted from three research repos (poset-mixture-npmle, sim/cpm,
-stochastic_process_mining/spm); see README.md and the consumer repos'
-.claude/REFACTOR_DESIGN.md.
+Extracted and unified from three research codebases into a single
+standalone library; see README.md.
 
 Two poset views coexist:
 

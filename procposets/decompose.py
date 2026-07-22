@@ -1,7 +1,7 @@
 """Decomposition facade — both decomposition views under one import.
 
-Two decompositions coexist by design (do NOT unify their renderers — the
-consumer repos bake each canonical string into byte-exact regressions):
+Two decompositions coexist by design (do NOT unify their renderers —
+each canonical string is pinned into byte-exact regressions downstream):
 
 - The **SP-tree** view (`SPTree`, `decompose(elements, rel) -> SPTree|None`),
   from the NPMLE engine: series/parallel only, returns ``None`` on a non-SP

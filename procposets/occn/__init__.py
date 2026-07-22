@@ -8,8 +8,7 @@ And :mod:`.to_signature` lifts a mined OCCN into the cospan ``Signature`` used b
 the rest of :mod:`procposets.cospan`.
 
 Validated against the authors' reference implementation; the validation harness
-(oracle bridge, structural diff, visualisers, generated logs) lives in the
-consumer repo's ``sim/occn_dev/`` (see its ``OCCN_DEV.md`` for the design/finding log).
+(oracle bridge, structural diff, visualisers, generated logs) is maintained separately.
 """
 from .fhm import OCDG, mine_ocdg
 from .markers import OCCN, Marker, MarkerGroup, mine_occn

@@ -123,7 +123,7 @@ class Oracle:
         if timed and noise_kernel == "swap":
             raise ValueError(
                 "timed traces support only the uniform eps kernel "
-                "(no mechanistic timed kernel is declared yet; see ROADMAP)"
+                "(no mechanistic timed kernel is declared yet)"
             )
 
         rels = self._select_candidates(cls, timed, max_exact_m, closure_cap, force_regime)
@@ -227,7 +227,7 @@ class Oracle:
         Compared fully in log space -- log-sum-exp per atom -- so the
         ordering is exact: the previous exp(clip(.., -700, 700)).mean()
         collapsed atoms with per-group ratios beyond the clip into exact
-        ties and could overflow the mean (DESIGN_REVIEW W17).  The score of
+        ties and could overflow the mean.  The score of
         the maximiser minus 1 is the Frank-Wolfe duality gap.
         """
         log_scores = _log_mean_exp_rows(self.logF - log_d[None, :])

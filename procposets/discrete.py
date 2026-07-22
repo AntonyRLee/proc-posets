@@ -22,7 +22,7 @@ Block family (compare the TILING / block transitions) -- the three weightings
 - ``"lincount"``         rho_i ∝ e(P_i) (option 3): the weighting under which the pooled event log is
                          uniform over traces (each variant weighted by its number of linear extensions).
 
-All three feed the block-SMD; comparing them and the Kemeny family is the point of demo/08_discrete_comparison.
+All three feed the block-SMD; comparing them and the Kemeny family is the point of this module.
 
 Refined family (fan-out) -- ``disc_angle``
 ------------------------------------------
@@ -192,8 +192,8 @@ def block_angle(m1, m2, weighting: Literal["uniform_variant", "support", "lincou
 # one of them, refine=False none (atomic). Depth-1 only; distinct labels within a prime assumed
 # (v1 caveat).
 #
-# RECURSIVE FAN-OUT (E1, paper App C "Outlook"; recursive=True, default False -- adoption pending
-# the demo-08 pre-adoption checks in the paper repo's docs/TODO.md): a refined block's atom
+# RECURSIVE FAN-OUT (E1, paper App C "Outlook"; recursive=True, default False -- adoption
+# pending pre-adoption checks): a refined block's atom
 # multiset is augmented with the DISCLOSED CONTENT of every composite descendant module, so shared
 # nested content is credited at every depth. The disclosure of a module is again the canonical
 # content of the paper's statement (iii), one level down:
@@ -405,7 +405,7 @@ def disc_angle(m1, m2, refine=True, context_depth=1, strict=True, recursive=Fals
     recursive=False    -- E1 recursive fan-out (paper App C "Outlook"): refined blocks also
                           disclose the content of composite descendant modules, so shared nested
                           content is graded; flat blocks are bit-identical to recursive=False.
-                          Off by default pending the pre-adoption checks (docs/TODO.md).
+                          Off by default pending the pre-adoption checks.
     chain_k=2          -- E2 relational ladder (paper App C "Outlook"): the rung(s) of prime
                           atoms, an int or a set of ints; rung k >= 2 = directed k-vertex paths
                           of the transitive reduction ('x<y<z'), rung 1 = typed membership

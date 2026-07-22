@@ -3,9 +3,8 @@ collapsed to ``M(m,σ)`` families, recorded *both* concretely (the boundary-
 rooted occurrence-net pomsets) *and* algebraically (a minimal boundary-stripped
 step-skeleton with loop splice-points), in one canonical, serializable object.
 
-Design: ``CLASS_EXTRACTION.md`` §27. This is the productized, deterministic,
-LLM-free form of what ``occn_dev/run_dag_comparison.py`` and
-``dag_render.render_catalogue_dags`` compute ad hoc. It is the **finite
+This is the productized, deterministic, LLM-free form of what
+``dag_render.render_catalogue_dags`` computes ad hoc. It is the **finite
 generating grammar of the model's trace language** (§27c): a run γ1→γ2 is a
 family baseline with its anchored loops spliced in (any multiplicity). The
 companion :mod:`procposets.cospan.trace_language` consumes the *algebraic* form to emit

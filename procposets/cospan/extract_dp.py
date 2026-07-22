@@ -1,7 +1,7 @@
 """Pomset-DP morphism extraction: the iso-class-quotiented replacement for the
 path-enumerating ``class_extraction.extract_classes``.
 
-Design: ``CLASS_EXTRACTION.md`` §21f. The old DFS enumerated morphisms of
+The old DFS enumerated morphisms of
 ``F(Sigma)`` as *linear firing sequences* (words over generators) and deduped
 by raw tuple -- so the exponentially-many interleavings of independent
 concurrent generators were all minted separately (the OCPN blowup). But a

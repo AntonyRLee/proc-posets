@@ -9,7 +9,7 @@ finite K, "the longest unrolling the data can witness". The cut-off is physicall
 the mass beyond K is q^K, so the truncated block chain converges geometrically to the LIMIT
 object `loop_limit`: the genuine cyclic block Markov chain in which the body's closing block
 returns to its opening block with probability q. That limit chain is exactly what a
-practitioner would draw for the loop; `demo/07_loop_truncation` measures the convergence rate.
+practitioner would draw for the loop.
 
 Conventions:
   * the body runs AT LEAST once (a do-while; a 0-or-more loop is the mixture of this family
@@ -76,7 +76,7 @@ def loop_limit(body: Poset, q: float, pre: tuple = (), post: tuple = ()):
     """The K -> infinity limit of `build(loop_model(...), context_depth=1)`: the cyclic block
     chain. Deterministic along pre ; body ; post, except the body's closing block, which
     returns to its opening block with probability q and continues with 1 - q. Returns
-    (matrix, states) in the `spm.matrix.build` format (compare via `distance.smd_rows`)."""
+    (matrix, states) in the `matrix.build` format (compare via `distance.smd_rows`)."""
     body_word = _word([body])
     pre_word, post_word = _word(pre), _word(post)
     word = pre_word + body_word + post_word

@@ -1,6 +1,6 @@
-"""Our OCCN (object-centric causal net) visualiser (graphviz) -- the
-heuristic/causal-net rendering that is our alternative to the Java/React
-reference (Liss et al.; driven separately by ``occn_dev/native_viz.py``).
+"""OCCN (object-centric causal net) visualiser (graphviz) -- the
+heuristic/causal-net rendering; the reference implementation (Liss et al.)
+is Java/React.
 
 ``draw_occn`` takes a :class:`procposets.occn.OCCN` (from :func:`procposets.occn.mine_occn`)
 and saves a PNG. Visual vocabulary (mirrors the reference's input-left /
@@ -108,7 +108,7 @@ def draw_occn(occn: OCCN, out_path: str, title: str | None = None, fmt: str = "p
     def shared_key(group, members):
         # an object-distribution split is WITHIN a type: link only same-type
         # markers that share a key (cross-type common partition indices are an
-        # encoding artefact, not a split; OCCN_DEV.md Finding F6).
+        # encoding artefact, not a split).
         by_tk: dict[tuple[str, int], list[str]] = {}
         for m, n in zip(group, members):
             by_tk.setdefault((m.otype, m.key), []).append(n)

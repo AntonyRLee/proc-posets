@@ -6,8 +6,7 @@ Faithful Python encoding of the abstraction in section 2b of the paper
 nodes carrying local routing logic (AND / XOR / OR / SEQ).  Edges carry a port
 type ``theta: E -> O`` (``None`` = untyped, i.e. the ``O = 1`` specialisation on
 that edge).  Multiple absorbing nodes may share a *label* via ``ell`` -- this is
-the mode-refinement device (e.g. Petri ``s_c``/``s_b`` both labelled ``s``)
-described in ``RUNNING_EXAMPLE.md`` section 3.
+the mode-refinement device (e.g. Petri ``s_c``/``s_b`` both labelled ``s``).
 
 The engine (``engine.py``) reads this structure; adapters (``from_*.py``) build
 it from discovered pm4py models.

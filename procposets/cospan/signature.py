@@ -4,7 +4,7 @@ A generator cospan ``g_{a,c}`` (``def:generator-cospan-general``) for activity
 label ``a`` in context ``c = (P, S)`` has a left boundary ``P``, an apex
 carrying a single hyperedge labelled ``a``, and a right boundary ``S``.  We
 record boundaries as sets of typed :class:`Port` triples ``(src, type, tgt)``
--- the canonical shared interface of ``RUNNING_EXAMPLE.md`` (the index 0..16
+-- the canonical shared interface (the index 0..16
 port map is just an enumeration of these triples).
 
 The full signature ``Sigma`` (``def:generator-cospan-general``) is a frozenset

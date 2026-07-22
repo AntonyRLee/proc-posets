@@ -12,7 +12,7 @@ Two backends, by the user's call:
    problem size; ``bound=1`` (the default) pins every variable to 1 -- the 1-1
    baseline -- so an unconstrained signature behaves exactly as before. If the box
    is too large, :class:`FeasibilityTooLarge` is raised (the signal to use backend 2).
-2. **External ILP solver (TODO -- see CLASS_EXTRACTION.md §34).** Pass ``solver=`` a
+2. **External ILP solver (TODO).** Pass ``solver=`` a
    callable to dispatch to e.g. PuLP / OR-Tools for unbounded or large systems. Not
    implemented here; the hook is in place so callers don't change.
 """

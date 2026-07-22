@@ -2,7 +2,7 @@
 
 Follows the *paper's* stated method (Weijters & Ribeiro, "Flexible Heuristics
 Miner", 2011) rather than pm4py's ``discover_heuristics_net`` — which is what the
-reference actually uses (OCCN_DEV.md §8, Divergence 1). We mine only the
+reference actually uses. We mine only the
 dependency relation D (typed arcs ``(src, otype, tgt)``) plus per-type START/END
 nodes; AND/XOR/OR splits are recovered downstream by the Listing-1.1 marker miner
 (M2), so FHM AND-measures are intentionally not computed (decision D8).

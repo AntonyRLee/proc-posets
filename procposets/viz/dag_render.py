@@ -1,5 +1,5 @@
 """Render occurrence-net DAGs to Graphviz DOT (and PNG/SVG via the ``dot``
-binary). Design: ``CLASS_EXTRACTION.md`` §19.
+binary).
 
 Two products:
 

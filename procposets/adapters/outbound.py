@@ -1,6 +1,6 @@
-"""Adapters from the sandbox's objects to pm4py's -- the bridge to the standard PM stack.
+"""Adapters from procposets' objects to pm4py's -- the bridge to the standard PM stack.
 
-The sandbox model (list of (Poset, weight)) maps onto pm4py three ways, one per technique
+The procposets model (list of (Poset, weight)) maps onto pm4py three ways, one per technique
 family:
     to_process_tree / to_petri_net   an XOR over the variants' SP trees (series -> SEQUENCE,
                                      parallel -> PARALLEL, leaf -> activity), then pm4py's

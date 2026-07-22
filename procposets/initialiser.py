@@ -1,5 +1,4 @@
-"""Higher-order moment initialiser for the NPMLE (ROADMAP M9; the theory is
-`docs/miners_as_npmle_specialisations.md` §8).
+"""Higher-order moment initialiser for the NPMLE.
 
 **This changes only the warm start, never what is identifiable or fitted.**
 The NPMLE consumes the per-group trace densities directly (`GroupedLog`); its
@@ -12,7 +11,7 @@ precedence tensor
 
 (dimension ~ m^k) and seeds column generation from the candidate whose moment
 best matches the data -- a cheaper-than-likelihood proxy that matters in the
-large-m regime (ROADMAP M6) where evaluating every candidate's likelihood is
+large-m regime where evaluating every candidate's likelihood is
 the cost.  Climbing ``k`` (up to ``k = m``, the full order = the trace law
 itself) is a *compute/quality dial*, never an identifiability parameter:
 `fit(..., init_order=k)` reaches the *same optimum* for every ``k``.

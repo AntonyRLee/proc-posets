@@ -1,8 +1,7 @@
 """Adapter: pm4py Petri net(s) -> logic-mediated multipartite LM-graph.
 
 A Petri net is already a flat notation (``rem:hierarchical-compilation``), so the
-mapping is direct and mirrors the running-example construction
-(``RUNNING_EXAMPLE.md`` section 3):
+mapping is direct and mirrors the running-example construction:
 
   place               -> XOR mediator  (choice over consumers / producers)
   silent transition   -> SEQ mediator, marked silent (eliminated by default;

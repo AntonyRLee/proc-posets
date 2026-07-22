@@ -1,6 +1,6 @@
 """Three-way structural comparison of model catalogues as occurrence-net DAGs.
 
-Design: ``CLASS_EXTRACTION.md`` §19. Where ``signature_diff`` compares the
+Where ``signature_diff`` compares the
 lossy *label-skeleton* (a string projection that erases wiring and so reports
 false agreement on, e.g., an N-poset vs a complete bipartite order, §19c),
 this module compares the **boundary-rooted labelled DAG** (the label-pomset of
@@ -173,7 +173,7 @@ def diff_dag_families(results: dict[str, ExtractionResult]) -> DagDiffReport:
 # ``diff_dags`` compares *exact* closings, so a model that enumerates a loop
 # unrolling explicitly (OCCN/OCPN's ``M(2,σ)``) shows it as "only occn+ocpn":
 # the master generates the same pomset by *splicing* its loop, never listing it,
-# so there is no master closing to match (CLASS_EXTRACTION.md §22h). The
+# so there is no master closing to match. The
 # splice-aware view factors loops *out* of each closing to its loop-free
 # **spine** and compares spines: two closings are in the same ``M(m,σ)`` family
 # iff they share a spine, so all unrollings collapse onto the baseline and the

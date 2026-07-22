@@ -6,7 +6,7 @@ Gallai's theorem on the comparability graph gives a unique decomposition tree:
     - otherwise                         -> PRIME node    (irreducibly non-SP; e.g. the N-poset)
 
 Series-parallel posets are exactly the prime-free ones. Prime blocks are kept ATOMIC
-(compared all-or-nothing), matching docs/DESIGN-comparison-object.md.
+(compared all-or-nothing).
 
 `.canonical()` gives a label that identifies a block across models (same activity structure
 => same string). Prime canonicalisation: distinct labels use the sorted label-edge list (fast path);

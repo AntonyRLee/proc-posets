@@ -2,7 +2,7 @@
 `ExtractionResult`s (from `class_extraction.extract_classes`) for
 structural, not merely linguistic, equivalence.
 
-Design: ``CLASS_EXTRACTION.md`` §14. Unlike ``morphism_schema.py`` (which
+Unlike ``morphism_schema.py`` (which
 recognizes sameness *within* one signature, where comparing ``Port``
 identity is meaningful), this module compares *across* two signatures from
 possibly-different notations/adapters, where ``Port`` naming/granularity
@@ -19,8 +19,8 @@ Three levels, applied in order:
 3. label-skeleton path diff: expand every fragment's ``Ref``s, collapse to
    the `@`-grouped sequence of activity labels only (drop all ports/types),
    and diff the two catalogues' skeletons as **sets**, not multisets --
-   multiplicity is known to be search-order-dependent (CLASS_EXTRACTION.md
-   §13's M1 vs M10), so a multiset diff would manufacture fake
+   multiplicity is known to be search-order-dependent, so a multiset diff
+   would manufacture fake
    count-mismatches with no structural meaning.
 
 Classifying *why* a residual difference exists (discovery-threshold
@@ -212,7 +212,7 @@ def decompose_loops(loop_legend: dict[Skeleton, str]) -> tuple[dict[str, tuple],
     `class_extraction._compress`'s greedy longest-match algorithm --
     applied here at the label-skeleton level (ports/types already dropped),
     not the `Generator`-identity level `morphism_schema`/`class_extraction`
-    use. CLASS_EXTRACTION.md §6 designed this folding mechanism for exactly
+    use. This folding mechanism was designed for exactly
     this purpose, but §9c/§11 found it never fires on a real signature at
     the identity level (port-typed variants of "the same" activity are
     literally different generators); checked here and confirmed it *does*
@@ -256,7 +256,7 @@ def _is_start_end_marker(label: str) -> bool:
 
 
 def strip_boundary_wrapper(skeleton: Skeleton) -> Skeleton:
-    """B3 adapter-convention normalization (``CLASS_EXTRACTION.md`` §14):
+    """B3 adapter-convention normalization:
     strip a leading/trailing run of steps that are *entirely*
     ``START_<ot>``/``END_<ot>`` labels.
 
@@ -421,8 +421,8 @@ def catalogue_pretty(
     find," in `a;b;(c x d);e` / `L1^m` form. Useful both for inspecting one
     notation's discovered catalogue on its own terms, and as the common
     rendering for comparing a discovered catalogue against the hand-
-    authored master signature's own catalogue by eye (CLASS_EXTRACTION.md
-    §14: "compare back to the master cospan M structure" is a separate axis
+    authored master signature's own catalogue by eye ("compare back to the
+    master cospan M structure" is a separate axis
     from comparing two discovered signatures against each other -- this
     function and :func:`diff_signatures` both apply to that axis too, the
     master signature's `ExtractionResult` is not privileged in any way).
