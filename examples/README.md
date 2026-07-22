@@ -1,6 +1,6 @@
 # Examples
 
-Small, self-contained, deterministic scripts demonstrating procposets. Each is
+Small, self-contained, deterministic scripts demonstrating proc-posets. Each is
 runnable with `uv run python examples/<name>.py`.
 
 - **`compare_models.py`** — dependency-free core: canonical modular

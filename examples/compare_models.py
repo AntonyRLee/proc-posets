@@ -1,7 +1,7 @@
 """Minimal, dependency-free example: canonically decompose a process model and
 compare two models by the stochastic-matrix distance (Result 3).
 
-Runs on a bare ``pip install procposets`` (no extras).
+Runs on a bare ``pip install proc-posets`` (no extras).
 
     uv run python examples/compare_models.py
 """

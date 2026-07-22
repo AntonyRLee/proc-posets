@@ -1,8 +1,8 @@
-# Contributing to procposets
+# Contributing to proc-posets
 
 ## Development setup
 
-procposets uses [uv](https://docs.astral.sh/uv/). The dev environment pulls
+proc-posets uses [uv](https://docs.astral.sh/uv/). The dev environment pulls
 every layer (numpy + matplotlib) so the whole suite runs:
 
 ```bash
@@ -12,7 +12,7 @@ uv run pytest -q   # the regression suite
 
 ## The one hard rule: byte-exact behaviour
 
-procposets was extracted value-for-value from three research codebases, and its
+proc-posets was extracted value-for-value from three research codebases, and its
 **self-contained regression suite** (`procposets/tests/regression/`) pins the
 library's numeric and structural output. There is no external oracle anymore, so
 that suite *is* the behaviour contract:
