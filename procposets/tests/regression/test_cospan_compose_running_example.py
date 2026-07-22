@@ -1,5 +1,5 @@
 """Validate the Sigma -> composite-diagrams composer against the canonical
-running example (``.claude/RUNNING_EXAMPLE.md``).
+running example (the canonical running example).
 
 The OCPT view states the process has exactly 2 (a/skip-a) x 2 (c/d item type)
 x 3 (i/n/i+n router mode) = 12 valid resolved sub-trees. ``compose_signature``
@@ -12,7 +12,7 @@ from __future__ import annotations
 from procposets.cospan.compose import compose_signature
 from procposets.cospan.engine import extract_signature
 
-from .test_cpm_engine_running_example import build_running_example
+from .test_cospan_engine_running_example import build_running_example
 
 
 def test_twelve_composite_diagrams():

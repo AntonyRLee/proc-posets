@@ -85,6 +85,9 @@ def _prime_canonical_iso(P: Poset) -> str:
 
 @dataclass
 class Leaf:
+    """An atom of the total modular decomposition: a single activity ``label``
+    (renders as the bare label)."""
+
     label: str
 
     def canonical(self) -> str:
@@ -101,6 +104,9 @@ class Leaf:
 
 @dataclass
 class Series:
+    """A sequential (ordinal-sum) block of the total modular decomposition;
+    renders as ``( .. ; .. )``."""
+
     parts: list  # ordered
 
     def canonical(self) -> str:
@@ -117,6 +123,9 @@ class Series:
 
 @dataclass
 class Parallel:
+    """A concurrent (parallel-composition) block of the total modular
+    decomposition; renders as ``( .. * .. )``. Treated as an atomic block."""
+
     parts: list  # unordered (commutative)
 
     def canonical(self) -> str:
@@ -133,6 +142,9 @@ class Parallel:
 
 @dataclass
 class Prime:
+    """An indecomposable (non-series-parallel) sub-poset, kept atomic; renders
+    as ``N{a<b, ..}`` (its label-edge list)."""
+
     poset: Poset  # the indecomposable sub-poset (kept atomic)
 
     def canonical(self) -> str:

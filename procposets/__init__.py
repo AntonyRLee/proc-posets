@@ -53,7 +53,17 @@ from .rel import (
 )
 
 # --- canonical Poset object (id+label; SPME base) --------------------------
-from .poset import Poset, from_dag, from_edges, leaf, n_poset, par, then
+from .poset import (
+    Model,
+    Poset,
+    from_dag,
+    from_edges,
+    leaf,
+    n_poset,
+    par,
+    sample_extension,
+    then,
+)
 from .poset import count_extensions  # guarded e(P) on the canonical Poset
 from ._extensions import IdealBudgetExceeded
 
@@ -82,10 +92,12 @@ from .simulate import (
     sample_keyed_log,
     sample_timed_grouped_log,
 )
-from .distance import bhattacharyya_angle, smd, smd_pairwise, smd_rows
+from .distance import Mode, bhattacharyya_angle, smd, smd_pairwise, smd_rows
 from .matrix import build as build_block_matrix
 from .matrix import normal_form_distribution
 from .estimate import (
+    Law,
+    Trace,
     log_likelihood,
     mixture_law,
     reweight,
@@ -101,6 +113,35 @@ from .loops import empirical_loop_model, loop_limit, loop_model, unrolling
 # access (PEP 562 __getattr__), importing its module (which imports numpy)
 # only then.  Needs the [estimate] extra.
 # ===========================================================================
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Static-only re-exports: give type-checkers the real signatures of the
+    # lazily-loaded numpy layer.  TYPE_CHECKING is False at runtime, so this
+    # never imports numpy -- the PEP 562 __getattr__ below does the actual lazy
+    # resolution and the numpy-free import contract (test_lazy_numpy) is intact.
+    from .diagnostics import (
+        bootstrap_weights,
+        identifiability_report,
+        recovery_report,
+        trivial_report,
+    )
+    from .initialiser import (
+        find_margin_equivalences,
+        margin_equivalent,
+        moment_seed,
+        poset_moment,
+    )
+    from .likelihood import Atom, GroupedLog, TimedGroupedLog, make_atom
+    from .npmle import (
+        FitResult,
+        fit,
+        polish_nuisances,
+        refit_weights,
+        trivial_chain_loglik,
+    )
+    from .oracle import Oracle
 
 _LAZY = {  # top-level name -> (submodule, attribute)
     **{n: ("likelihood", n) for n in
@@ -118,7 +159,7 @@ _LAZY = {  # top-level name -> (submodule, attribute)
 }
 
 
-def __getattr__(name):  # PEP 562: lazy numpy-layer resolution
+def __getattr__(name: str) -> object:  # PEP 562: lazy numpy-layer resolution
     info = _LAZY.get(name)
     if info is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -128,7 +169,7 @@ def __getattr__(name):  # PEP 562: lazy numpy-layer resolution
     return val
 
 
-def __dir__():
+def __dir__() -> list[str]:
     return sorted(list(globals()) + list(_LAZY))
 
 __all__ = [
@@ -142,8 +183,8 @@ __all__ = [
     "sample_extension_tree",
     "tree_relations", "series", "parallel", "enumerate_sp",
     # canonical Poset
-    "Poset", "leaf", "then", "par", "n_poset", "from_dag", "from_edges",
-    "count_extensions", "IdealBudgetExceeded",
+    "Poset", "Model", "leaf", "then", "par", "n_poset", "from_dag", "from_edges",
+    "sample_extension", "count_extensions", "IdealBudgetExceeded",
     # total modular decomposition
     "Leaf", "Series", "Parallel", "Prime", "modular_decompose", "tiling",
     # traces
@@ -162,9 +203,9 @@ __all__ = [
     "sample_timed_grouped_log",
     "trivial_report", "recovery_report", "identifiability_report", "bootstrap_weights",
     # A1 stochastic distance + known-law estimators (stdlib)
-    "smd", "smd_rows", "smd_pairwise", "bhattacharyya_angle",
+    "smd", "smd_rows", "smd_pairwise", "bhattacharyya_angle", "Mode",
     "build_block_matrix", "normal_form_distribution",
     "variant_laws", "reweight", "mixture_law", "rho_counting", "rho_mle",
-    "log_likelihood",
+    "log_likelihood", "Trace", "Law",
     "unrolling", "loop_model", "loop_limit", "empirical_loop_model",
 ]

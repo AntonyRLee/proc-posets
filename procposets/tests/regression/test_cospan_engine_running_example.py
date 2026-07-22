@@ -1,5 +1,5 @@
 """Golden test: the engine reproduces the 22-generator signature of the
-canonical running example (``.claude/RUNNING_EXAMPLE.md``).
+canonical running example (the canonical running example).
 
 We build the LM-graph directly from the section-3 OCPN place structure (17
 places, mode-refined transitions s_c/s_b, r_i/r_n/r_in, G2_1..6, transparent
@@ -86,7 +86,7 @@ def _gen(label, left, right) -> Generator:
     return Generator(label, L, R)
 
 
-# Expected signature transcribed from RUNNING_EXAMPLE.md
+# Expected signature transcribed from the canonical running example
 # (per-generator interface table; port index 0/16 = empty boundary side).
 EXPECTED = {
     _gen("G1", [], [("G1", "ord", "a"), ("G1", "con", "c")]),

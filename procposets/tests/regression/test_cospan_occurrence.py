@@ -1,4 +1,4 @@
-"""Tests for the occurrence-net DAG comparison (CLASS_EXTRACTION.md §19)."""
+"""Tests for the occurrence-net DAG comparison (the class-extraction design, §19)."""
 
 from __future__ import annotations
 

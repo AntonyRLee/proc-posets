@@ -1,5 +1,5 @@
 """Tests for trace-language generation from the splice representation
-(CLASS_EXTRACTION.md §27c): bounded by a loop cut-off, exact for series-parallel
+(the class-extraction design, §27c): bounded by a loop cut-off, exact for series-parallel
 families."""
 
 from __future__ import annotations

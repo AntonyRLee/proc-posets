@@ -55,7 +55,7 @@ class LinearConstraint:
     ``{p:1} <= cmax``; a shared-key partition of input leg ``q`` over output legs
     ``p1..pk`` = ``{p1:1,...,pk:1, q:-1} == 0``."""
 
-    terms: frozenset  # frozenset[tuple[Port, int]]
+    terms: frozenset[tuple[Port, int]]
     rel: str
     rhs: int
 
@@ -63,10 +63,10 @@ class LinearConstraint:
         if self.rel not in _REL:
             raise ValueError(f"rel must be one of {_REL}, got {self.rel!r}")
 
-    def coeffs(self) -> dict:
+    def coeffs(self) -> dict[Port, int]:
         return dict(self.terms)
 
-    def ports(self) -> set:
+    def ports(self) -> set[Port]:
         return {p for p, _ in self.terms}
 
     def __str__(self) -> str:
@@ -96,8 +96,8 @@ class Generator:
     label: str
     left: frozenset[Port]
     right: frozenset[Port]
-    constraints: frozenset = frozenset()  # frozenset[LinearConstraint]
-    weights: frozenset = frozenset()  # frozenset[tuple[Port, int]]
+    constraints: frozenset[LinearConstraint] = frozenset()
+    weights: frozenset[tuple[Port, int]] = frozenset()
 
     def constrained_ports(self) -> set:
         """Legs mentioned by some constraint (the rest default to count 1)."""
