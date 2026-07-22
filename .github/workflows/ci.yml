@@ -39,8 +39,10 @@ jobs:
       # `import procposets` must succeed with numpy genuinely absent -- the
       # PEP 562 lazy layer must not pull it eagerly (guards test_lazy_numpy in a
       # real clean environment, not just a mocked one).
+      # NB: a bare `uv run` re-syncs the default `dev` group (which pulls numpy),
+      # undoing `--no-dev` above; repeat `--no-dev` here to keep the env base-only.
       - run: |
-          uv run python -c "
+          uv run --no-dev python -c "
           import importlib.util, procposets
           assert importlib.util.find_spec('numpy') is None, 'base install must be numpy-free'
           print('procposets', procposets.__version__, 'imports numpy-free OK')
