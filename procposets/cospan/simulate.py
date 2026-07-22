@@ -17,15 +17,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import pandas as pd
 from pm4py.objects.ocel.obj import OCEL
 
+from ._ocel import _ocel_from_rows
 from .signature import Signature
 from .splice import SpliceRepresentation
 from .trace_language import model_traces
 
-EID, ACT, TS = "ocel:eid", "ocel:activity", "ocel:timestamp"
-OID, OTYPE = "ocel:oid", "ocel:type"
 _BASE = datetime(2025, 1, 1)
 
 
@@ -142,7 +140,4 @@ def ocel_from_signature(
                         rows.append((e, activity, t, oid[ot], ot))
                 case += 1
 
-    rel = pd.DataFrame(rows, columns=[EID, ACT, TS, OID, OTYPE])
-    events = rel[[EID, ACT, TS]].drop_duplicates().reset_index(drop=True)
-    objects = rel[[OID, OTYPE]].drop_duplicates().reset_index(drop=True)
-    return OCEL(events=events, objects=objects, relations=rel)
+    return _ocel_from_rows(rows)

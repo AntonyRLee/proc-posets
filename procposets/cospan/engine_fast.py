@@ -43,9 +43,16 @@ from __future__ import annotations
 from itertools import combinations, product
 
 from .._unionfind import UnionFind
-from .engine import GAMMA2, _collapse_pure_terminus, _strip_termini, _traverse
+from .engine import (
+    GAMMA2,
+    _collapse_pure_terminus,
+    _gen_from_bundles,
+    _prepare_extraction,
+    _strip_termini,
+    _traverse,
+)
 from .lmgraph import LMGraph
-from .signature import Generator, Port, Signature
+from .signature import Signature
 from .signature_compare import canon_key
 
 _ENUM_CAP = 200_000  # per-coupled-component arc product budget
@@ -181,12 +188,7 @@ def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
     """Output-sensitive twin of :func:`engine.extract_signature`: one representative
     :class:`Generator` per distinct CanonKey, without the cross-type ``|B|x|F|``
     blow-up.  See the module docstring for the exactness contract."""
-    if remove_silent and g.silent:
-        g = g.without_silent()
-    if surface_termini and any(
-        g.lab(a) == GAMMA2 or g.lab(a).startswith("END_") for a in g.activities
-    ):
-        surface_termini = False
+    g, surface_termini = _prepare_extraction(g, remove_silent, surface_termini)
     best: dict = {}
 
     def _bkey(bundle):  # deterministic order over a set of (label, type) bundles
@@ -203,8 +205,6 @@ def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
         F = _collapse_pure_terminus(F) if surface_termini else _strip_termini(F)
         for P in sorted(B, key=_bkey):
             for S in sorted(F, key=_bkey):
-                left = frozenset(Port(p, t, lab) for (p, t) in P)
-                right = frozenset(Port(lab, t, s) for (s, t) in S)
-                gen = Generator(lab, left, right)
+                gen = _gen_from_bundles(lab, P, S)
                 best.setdefault(canon_key(gen), gen)
     return Signature(frozenset(best.values()))
