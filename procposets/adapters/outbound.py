@@ -20,11 +20,16 @@ from __future__ import annotations
 
 import warnings
 
-warnings.filterwarnings("ignore")
-
-import pandas as pd
-import pm4py
-from pm4py.algo.evaluation.earth_mover_distance import algorithm as _emd
+# pandas/pm4py emit noisy import-time warnings.  Suppress them ONLY across these
+# imports via a scoped context manager -- importing this module must not mutate
+# the process-wide warnings filter (the old module-level
+# ``warnings.filterwarnings("ignore")`` silenced every warning for any program
+# that imported the [pm4py] adapter layer).
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import pandas as pd
+    import pm4py
+    from pm4py.algo.evaluation.earth_mover_distance import algorithm as _emd
 
 from ..moddecomp import Leaf, Parallel, Series, decompose
 from ..poset import Model

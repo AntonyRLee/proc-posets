@@ -102,12 +102,16 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
 
 ## Workstream 3 — Finish PMN & SPM (small)
 
-- [ ] **3.1 PMN: merge `arl/alias-cutover`** (1 commit ahead of PMN `main`); fix stale `CLAUDE.md`
-  "107 tests" → 201. `value-preserving`
-- [ ] **3.2 SPM: re-point 5 demo/`paper_figures` scripts + 10 tests** off `spm.*` → `procposets.*`
-  (1:1 names); delete the 8 tests procposets already mirrors (or keep as smoke). `value-preserving`
-- [ ] **3.3 SPM: delete dead `spm/viz.py`, then the `spm/` shim** + its wheel-packaging; update the
-  stale `experiments/README.md` (still calls `spm/` "the reusable library"). `none` / `blocked`
+- [x] **3.1 PMN: merge `arl/alias-cutover`** — DONE 2026-07-22: fixed `CLAUDE.md` "107 tests"→"201 tests"
+  (`3b2b976`; verified `uv run pytest` = 201 passed). Branch merge to PMN `main` handled in WS 4.4.
+  `value-preserving`
+- [x] **3.2 SPM: re-point 5 scripts + 10 tests** — DONE 2026-07-22 (SPM `c5161f2`): all 15 `spm.*`
+  consumers re-pointed to `procposets.*` (1:1 names; `spm.viz`→`procposets.viz.signature_diagram`).
+  Kept the 8 procposets-mirrored tests as consumer smoke coverage. `value-preserving`
+- [x] **3.3 SPM: delete `spm/viz.py` + the `spm/` shim** — DONE 2026-07-22 (SPM `c5161f2`): removed the
+  `experiments/spm/` shim + its wheel-packaging (spm-sandbox is now `[tool.uv] package = false`);
+  de-staled `experiments/README.md` (`spm/` paths→`procposets/`, dropped the "reusable library" claim).
+  SPM suite: 54 passed. `none`
 
 ## Workstream 4 — Independent-release hygiene
 
@@ -121,9 +125,20 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
   the three consumer repo names, and the consumer-doc filenames. Currently green. `none`
 - [ ] **4.4 Merge `output-sensitive-extract-signature` → `main`** — everything above assumes the
   refactor is mainline; it currently isn't. (Owner decision.) `none`
-- [ ] **4.5 (open Phase-0 latents)** triage 3 correctness smells (compose LoopBox dedup bypass,
-  morphism_schema unweighted Counter, simulate `trees[0]` shared-alphabet) + 2 import-time side effects
-  (`outbound` `filterwarnings`, `spm_viz` `matplotlib.use`). `changes-values` / `value-preserving`
+- [~] **4.5 (open Phase-0 latents)** — PARTIAL 2026-07-22. **Import side effect DONE (value-preserving):**
+  `adapters/outbound.py` no longer calls a module-level `warnings.filterwarnings("ignore")` (which
+  silenced warnings process-wide for anyone importing the [pm4py] layer); scoped to just the pandas/pm4py
+  imports via `warnings.catch_warnings()`. **DEFERRED pending owner sign-off** (they change research
+  numerics + the frozen regression goldens, so not touched unilaterally):
+    1. `compose.py` LoopBox dedup — the `seen`-key may not distinguish LoopBox placements, so composites
+       differing only in a loop box can wrongly dedup (or fail to).
+    2. `morphism_schema.py` — a `Counter(g.left)`/`Counter(g.right)` reads port multiplicity but a
+       boundary tally may be unweighted where it should carry `c`.
+    3. `simulate.py:91` `alphabet = sorted(mix.trees[0].elements())` — the sampler takes the alphabet
+       from ONLY the first mixture component; components with a different element set lose elements.
+  Also **DEFERRED (environmental):** `viz/signature_diagram.py:20` `matplotlib.use("Agg")` forces the
+  backend at import (overrides a consumer's choice); removing it risks breaking headless demos, so leave
+  for a deliberate call. `changes-values` / `value-preserving`
 
 ### NOT procposets' concern (push to the geometry-paper repo)
 Split-Miner anomaly investigation · supplement reproduction commands · the Zenodo DOI "to pin in the
