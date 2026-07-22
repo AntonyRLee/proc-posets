@@ -123,8 +123,12 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
 - [x] **4.3 Add a release-gate grep** — DONE 2026-07-22 (`procposets/tests/test_release_gate.py`):
   scans the shipping tree (package source minus `tests/`) and fails on `/home/arl`, `sim/cpm`,
   the three consumer repo names, and the consumer-doc filenames. Currently green. `none`
-- [ ] **4.4 Merge `output-sensitive-extract-signature` → `main`** — everything above assumes the
-  refactor is mainline; it currently isn't. (Owner decision.) `none`
+- [x] **4.4 Merge to `main` + push (all repos)** — DONE 2026-07-22. The refactor had already landed on
+  procposets `main` via PR #1/#2 (done on GitHub outside the session); the **migration** merged via
+  **PR #3** (`self-containment-sweep`→`main`, merge commit `0339120`). Pushed: procposets
+  `main`+`self-containment-sweep`; sim `arl/sosym`; PMN `main`+`arl/alias-cutover`; SPM `arl/main`.
+  All fast-forward / clean-merge (no force). NB the SPM remote reports it **moved** to
+  `stochastic-comparison-process-mining.git` (push succeeded via redirect; update the remote URL). `none`
 - [~] **4.5 (open Phase-0 latents)** — PARTIAL 2026-07-22. **Import side effect DONE (value-preserving):**
   `adapters/outbound.py` no longer calls a module-level `warnings.filterwarnings("ignore")` (which
   silenced warnings process-wide for anyone importing the [pm4py] layer); scoped to just the pandas/pm4py
