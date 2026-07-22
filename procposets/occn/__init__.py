@@ -9,6 +9,14 @@ the rest of :mod:`procposets.cospan`.
 
 Validated against the authors' reference implementation; the validation harness
 (oracle bridge, structural diff, visualisers, generated logs) is maintained separately.
+
+Scope (migration WS 2.4): this subpackage is an **optional inbound adapter** --
+it turns an object-centric event log into a cospan ``Signature`` for the rest of
+the library to work on. It is deliberately kept OUT of the top-level
+``procposets`` ``__all__`` (import it explicitly as ``procposets.occn``); the
+numpy-free algebraic core neither imports nor depends on it. The miner itself is
+stdlib-only, but the logs it consumes are produced upstream via the ``[pm4py]``
+path, so treat it as the ``[pm4py]``-adjacent discovery front-end.
 """
 from .fhm import OCDG, mine_ocdg
 from .markers import OCCN, Marker, MarkerGroup, mine_occn

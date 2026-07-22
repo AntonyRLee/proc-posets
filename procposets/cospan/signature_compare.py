@@ -54,10 +54,6 @@ def is_gamma_or_marker(label: str) -> bool:
     )
 
 
-# Back-compat alias for the pre-rename name (gamma-inclusive membership).
-is_boundary_label = is_gamma_or_marker
-
-
 def _type_multiset(ports) -> tuple:
     """The object-type multiset of a leg-set, as a sorted ``((type, count), ...)``
     tuple -- the notation-independent shape of one boundary side."""

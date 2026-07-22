@@ -56,16 +56,21 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
   evolutions (`canonical_key`→`label_multiset_key`, viz `LayoutStyle` threading). **20 files kept on cpm**
   (glue-entangled + the build_running_example fixture cluster that shares a fixture with the glue-bound
   test_explain_split) → they flip in 1.7 when the glue relocates. `api-breaking`
-- [ ] **1.6 Repoint the manuscript figure chain** — `master_signature.py`, `trend_signature.py`,
-  `ground_signature.py`, `liss_faithful_signature.py`, the `render_ed_chest_pain_*.py` scripts still
-  build on `cpm.*`. This is what makes the paper's artifact depend on cpm today. `api-breaking`
-- [ ] **1.7 Relocate cpm pipeline/CLI glue OUT to `sim/demos/` (NOT into the library)** —
-  `pipeline/generate/spec/artifacts/report/conversion_consistency/binding_probe/signature_cli/splice_cli`
-  carry ED/Liss pipeline specifics. Keep as thin glue importing procposets. `api-breaking`
-- [ ] **1.8 Retire the oracle suite** — convert `sim/tests` `*_matches_cpm` cross-checks to
-  self-consistency (or delete) once cpm is gone. `blocked` (on 1.2–1.7)
-- [ ] **1.9 Delete `sim/cpm/`** (~9,475 LoC) + drop the ad-hoc procposets install from `sim/.venv`.
-  Verify sim's suite green on procposets-only. `blocked` (final teardown)
+- [x] **1.6 Repoint the manuscript figure chain** — DONE 2026-07-22 (sim `023b4ff`): only
+  `ground_signature.py` + `test_master_signature.py` remained on cpm (the rest flipped in WS 1.5);
+  flipped to procposets/demos.glue. `api-breaking`
+- [x] **1.7 Relocate cpm pipeline/CLI glue OUT to `demos/glue/`** — DONE 2026-07-22 (sim `023b4ff`):
+  10 glue modules (`pipeline/generate/spec/artifacts/report/conversion_consistency/binding_probe/`
+  `signature_cli/splice_cli` + the `loop_family` worked example) relocated to `sim/demos/glue/`;
+  core imports → procposets, glue↔glue stay relative. The 20 kept-on-cpm files flipped in lockstep
+  (incl. the dynamic `__import__` in `test_dag_render`); adapted the `canonical_key`/viz-`LayoutStyle`/
+  `unroll`-split API evolutions. `api-breaking`
+- [x] **1.8 Retire the oracle suite** — DONE 2026-07-22: there is **no** `*_matches_cpm` suite; the
+  real oracles are `occn_dev`/reference-based and already on procposets. Only fixed the stale
+  `occn_dev/conftest.py` docstring. `none`
+- [x] **1.9 Delete `sim/cpm/`** — DONE 2026-07-22 (sim `c3f75d8`): removed the bundled copy
+  (7,834 LoC, 37 files). procposets is a proper editable dep in `sim/pyproject.toml` (WS 1.1), so
+  no ad-hoc `.venv` install to drop. **sim suite 209 passed on procposets alone.** `blocked`→DONE
 
 ## Workstream 2 — Self-containment of procposets (in progress on branch `self-containment-sweep`)
 
@@ -73,21 +78,27 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
   ~40 consumer-doc refs, the `npmle.py` reverse-leak, and the `spm_viz.py` `cpm/vis.py` provenance
   all removed. Verified: the shipping tree (package source minus tests) now greps clean of every
   leak string — locked by the WS 4.3 release-gate test. `none`
-- [ ] **2.2 Golden-test decision (self-containment crux)** — KEEP `tests/regression/test_{cpm,np,spm}_*`
-  as the library's behaviour contract (already self-contained); only **de-name** prefixes + docstrings
-  (`test_cpm_*`→cospan-suite, etc.). DELETE the `tests/test_golden_*` cross-check scaffolds (hardcode
-  `/home/arl/Research`, import old consumer code) — PMN/SPM-side once their old modules are gone,
-  cpm-side `blocked` on 1.9. `value-preserving` / `blocked`
+- [~] **2.2 Golden-test decision (self-containment crux)** — KEEP `tests/regression/test_{cpm,np,spm}_*`
+  as the library's behaviour contract (already self-contained). **cpm-side DONE** 2026-07-22 (`1b07b22`):
+  the 5 `test_golden_{unroll,cospan,analysis,ocel,viz}.py` cpm cross-check scaffolds deleted with the
+  oracle. **Remaining:** the np/spm-side goldens (`test_golden_{poset,estimation,extensions}`) — retire
+  once PMN/SPM old modules are gone (WS 3); optional de-naming of the `test_cpm_*` prefixes.
+  `value-preserving` / partial
 - [x] **2.3 Rename `viz/spm_viz.py`** — DONE 2026-07-22 (`7df83a9`): renamed to
   `viz/signature_diagram.py`; consumer imports migrated in lockstep (sim flipped in WS 1.5). `api-breaking`
-- [ ] **2.4 Scope the `occn/` miner** — `fhm.py` = the Liss et al. FHM discovery miner. Keep as a
-  clearly-labelled `[pm4py]` **inbound adapter** (already out of top-level `__all__`), or push back to
-  the cpm consumer if the library should carry no miner. `changes-values`
+- [x] **2.4 Scope the `occn/` miner** — DONE 2026-07-22: kept in-library as a clearly-labelled optional
+  **inbound adapter** (added a Scope note to `occn/__init__.py`); already out of the top-level `__all__`,
+  imports no third-party libs, and the numpy-free core neither imports nor depends on it. Docstring-only,
+  so **no value change**. `changes-values`→none
 - [ ] **2.5 Promote SPM-reached privates to public** — `discrete._alphabet`, `matrix._block_sequence`,
   `equivalence._activity_pomsets` (SPM imports these). `value-preserving`
-- [ ] **2.6 Remove leftover compat shims** — root `equivalence.py` shim + remaining Phase-4 aliases
-  (`is_boundary_label`, …), once consumers stop using the old paths. Keep the intentional public aliases
-  (`count_linear_extensions`, `Model`). `api-breaking` / `blocked`
+- [x] **2.6 Remove leftover compat shims** — DONE 2026-07-22: deleted the root `procposets/equivalence.py`
+  shim and the `is_boundary_label = is_gamma_or_marker` alias. Re-pointed every consumer in lockstep
+  (name-identical): sim ×2 (`is_boundary_label`→`is_gamma_or_marker`), PMN ×3 + SPM ×4
+  (`procposets.equivalence`→`procposets.cospan.equivalence`), plus the `test_lazy_numpy` witness and
+  the now-obsolete alias-identity regression test. Kept the intentional public aliases
+  (`count_linear_extensions`, `Model`). Suites green: procposets 336, sim 209, PMN 201, SPM 54.
+  `api-breaking`→DONE
 
 ## Workstream 3 — Finish PMN & SPM (small)
 

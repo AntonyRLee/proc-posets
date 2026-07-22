@@ -7,7 +7,7 @@ matching DIFFERENT sets -- ``signature_compare`` is gamma-inclusive
 ``END_`` only -- so a copy-paste or wrong import silently changed which labels
 counted as boundary. This pins the membership and the intended difference.
 """
-from procposets.cospan.signature_compare import is_boundary_label, is_gamma_or_marker
+from procposets.cospan.signature_compare import is_gamma_or_marker
 from procposets.cospan.signature_diff import _is_start_end_marker
 
 _START_END = ["START_o", "END_o", "START_", "END_"]
@@ -32,7 +32,3 @@ def test_start_end_only_predicate_membership():
 def test_the_two_predicates_differ_exactly_on_gamma():
     for lab in _GAMMA:
         assert is_gamma_or_marker(lab) and not _is_start_end_marker(lab)
-
-
-def test_back_compat_alias_is_the_gamma_inclusive_predicate():
-    assert is_boundary_label is is_gamma_or_marker
