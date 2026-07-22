@@ -34,7 +34,6 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from enum import Enum
 
 from .signature import Generator, Port, Signature
 
@@ -192,11 +191,6 @@ def _flatten_generators(body: tuple, by_name: dict[str, NamedMorphism]) -> set[G
         else:
             out.add(step)
     return out
-
-
-class _Status(Enum):
-    ON_STACK = "on_stack"
-    RESOLVED = "resolved"
 
 
 class TooManyFrontiers(RuntimeError):

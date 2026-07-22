@@ -111,9 +111,8 @@ def transitive_reduction(rel: Rel) -> Rel:
 # and pass it in, so monkeypatching rel.MAX_IDEAL_STATES (the historical
 # knob, e.g. in the oracle-downgrade test) still steers the guard.
 from ._extensions import (  # noqa: E402
-    IdealBudgetExceeded,
+    IdealBudgetExceeded,  # noqa: F401  re-export: `procposets.rel.IdealBudgetExceeded` is a documented consumer surface (PMN)
     MAX_IDEAL_STATES,
-    preds as _preds,
 )
 from . import _extensions as _ext  # noqa: E402
 
@@ -131,10 +130,6 @@ def count_linear_extensions(elements, rel) -> int:
 
 def sample_linear_extension(elements, rel, rng):
     return _ext.sample_extension_poset(elements, rel, rng, max_states=MAX_IDEAL_STATES)
-
-
-def _check_ideal_budget(elements, rel) -> None:
-    _ext.check_ideal_budget(elements, rel, max_states=MAX_IDEAL_STATES)
 
 
 def enumerate_posets(elements: Iterable[str]) -> List[Rel]:

@@ -14,8 +14,7 @@ Modules are imported by full path (matching the source repo's usage), so
 
 The pm4py model adapters live in ``procposets.adapters``; ``procposets.occn``
 is the object-centric causal-net miner.  ``cospan.equivalence`` is the [graph]
-structural-equivalence surface (it moved here from the package root;
-``procposets.equivalence`` remains as a compatibility shim).
+structural-equivalence surface.
 """
 
 # The output-sensitive extractor is a light B0-only convenience surfaced at the

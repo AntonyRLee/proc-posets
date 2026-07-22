@@ -45,7 +45,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .rel import Rel, count_linear_extensions, respects, sample_linear_extension
+from .rel import Rel, respects, sample_linear_extension
 
 Tuple_k = Tuple[str, ...]
 
