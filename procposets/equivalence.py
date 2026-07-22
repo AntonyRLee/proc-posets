@@ -9,6 +9,7 @@ from ``procposets.cospan.equivalence`` directly.
 
 from .cospan.equivalence import (
     TraceCheck,
+    activity_pomsets,
     diff,
     drop_boundary_activities,
     equal,
@@ -19,6 +20,7 @@ from .cospan.equivalence import (
 
 __all__ = [
     "TraceCheck",
+    "activity_pomsets",
     "diff",
     "drop_boundary_activities",
     "equal",

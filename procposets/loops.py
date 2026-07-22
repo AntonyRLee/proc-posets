@@ -27,7 +27,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 
-from .matrix import END, START, _block_sequence
+from .matrix import END, START, block_sequence
 from .moddecomp import decompose
 from .poset import Model, Poset, then
 
@@ -68,7 +68,7 @@ def loop_model(body: Poset, q: float, K: int, pre: tuple = (), post: tuple = (),
 def _word(parts) -> list[str]:
     out: list[str] = []
     for p in parts:
-        out += _block_sequence(decompose(p))
+        out += block_sequence(decompose(p))
     return out
 
 

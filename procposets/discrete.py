@@ -60,7 +60,7 @@ def kemeny(P: Poset, Q: Poset) -> int:
     return len(rP ^ rQ)
 
 
-def _alphabet(model):
+def alphabet(model):
     V = set()
     for P, _ in model:
         V |= set(P.labels.values())
@@ -84,7 +84,7 @@ def _pair_relation(P: Poset, x: str, y: str, inv=None) -> str:
 
 def precedence(model):
     """For each unordered label pair, the rho-weighted categorical over {lt, gt, par}."""
-    V = _alphabet(model)
+    V = alphabet(model)
     tot = sum(w for _, w in model) or 1.0
     # inv depends only on P, not the (x, y) pair, so build it once per variant
     # instead of rebuilding it inside the C(|V|,2)*|model| inner loop.  The
@@ -103,7 +103,7 @@ def precedence(model):
 def order_angle(m1, m2):
     """Bhattacharyya angle between the two models' pairwise-precedence footprints (the 'Kemeny angle').
     Same form as the block-SMD, over the common label pairs. Requires a common alphabet."""
-    if _alphabet(m1) != _alphabet(m2):
+    if alphabet(m1) != alphabet(m2):
         raise ValueError("order_angle needs a common alphabet (common vertex set).")
     p1, p2 = precedence(m1), precedence(m2)
     total = 0.0

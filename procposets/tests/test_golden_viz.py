@@ -29,7 +29,7 @@ def _cpm(module):
 
 def test_viz_modules_import():
     pytest.importorskip("matplotlib")
-    for m in ("string_diagram", "compare_vis", "dag_render", "spm_viz"):
+    for m in ("string_diagram", "compare_vis", "dag_render", "signature_diagram"):
         importlib.import_module(f"procposets.viz.{m}")
     # occn_vis needs the graphviz python lib
     pytest.importorskip("graphviz")
@@ -97,18 +97,18 @@ def test_string_diagram_style_overrides_change_output():
     plt.close(fig)
 
 
-def test_spm_viz_extract_generators_pinned():
+def test_signature_diagram_extract_generators_pinned():
     # Retired golden seam: this began as a cross-check against SPME's spm.viz /
     # spm.poset.  Both became pure shims that re-export procposets (spm/viz.py does
-    # `from procposets.viz.spm_viz import *`; spm/__init__ aliases
+    # `from procposets.viz.signature_diagram import *`; spm/__init__ aliases
     # sys.modules["spm.poset"] = procposets.poset), so the old
     # `== oviz.extract_generators(model(opos))` side re-entered the SAME procposets
     # function object on an equal input -- a tautology that could no longer catch a
     # regression, hung off a hardcoded external path.  It survives as a
     # self-contained regression on the pinned generator-cospan signature (value
-    # computed from procposets.viz.spm_viz.extract_generators).
+    # computed from procposets.viz.signature_diagram.extract_generators).
     pytest.importorskip("matplotlib")
-    import procposets.viz.spm_viz as nviz
+    import procposets.viz.signature_diagram as nviz
     import procposets as pp
 
     def model(mp):

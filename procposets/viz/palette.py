@@ -7,17 +7,17 @@ merging them would shift every modulo colour assignment and break the byte-exact
 DOT golden. Hexes and list order are verbatim copies of the per-module originals;
 changing any value changes rendered output. (Note the two case conventions are
 intentional and load-bearing for the byte-exact DOT: dag_render emits lowercase hex,
-string_diagram/spm_viz use the uppercase "Red, Black & Blue" variants.)
+string_diagram/signature_diagram use the uppercase "Red, Black & Blue" variants.)
 """
 from __future__ import annotations
 
 # --- named hexes shared across >1 renderer (deduplicated here) --------------
-ALIZARIN = "#D2292D"          # red variant   (string_diagram, spm_viz)
-COTTON_BLUE = "#1761B0"       # blue variant  (string_diagram, spm_viz)
-OLD_BLACK = "#282828"         # black variant (string_diagram, spm_viz)
+ALIZARIN = "#D2292D"          # red variant   (string_diagram, signature_diagram)
+COTTON_BLUE = "#1761B0"       # blue variant  (string_diagram, signature_diagram)
+OLD_BLACK = "#282828"         # black variant (string_diagram, signature_diagram)
 GREY = "#9E9E9E"              # unused spare  (string_diagram)
 ALL_MODELS_GREEN = "#2ca02c"  # every model agrees (dag_render all-models combo)
-BOUNDARY_GREY = "#bbbbbb"     # IN/OUT / gamma boundary roots (dag_render, spm_viz)
+BOUNDARY_GREY = "#bbbbbb"     # IN/OUT / gamma boundary roots (dag_render, signature_diagram)
 SPLICE_BROWN = "#8c564b"      # dag_render dashed loop/splice edge
 
 # --- occn_vis object-type palette (7 items, includes green) -----------------
