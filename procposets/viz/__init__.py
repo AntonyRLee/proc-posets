@@ -8,5 +8,5 @@ carries no matplotlib/graphviz.  Modules are imported by full path.
 - dag_render     : occurrence-net / diff -> Graphviz DOT (needs the `dot`
                    binary at runtime; `dag_render.has_dot()` guards it)
 - occn_vis       : OCCN -> drawing (python graphviz lib; pm4py for OCPN)
-- spm_viz        : stochastic-matrix / SMD heatmaps (matplotlib)
+- signature_diagram : model signature catalogue + morphism / SMD-heatmap figures (matplotlib)
 """

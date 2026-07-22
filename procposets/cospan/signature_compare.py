@@ -54,10 +54,6 @@ def is_gamma_or_marker(label: str) -> bool:
     )
 
 
-# Back-compat alias for the pre-rename name (gamma-inclusive membership).
-is_boundary_label = is_gamma_or_marker
-
-
 def _type_multiset(ports) -> tuple:
     """The object-type multiset of a leg-set, as a sorted ``((type, count), ...)``
     tuple -- the notation-independent shape of one boundary side."""
@@ -135,7 +131,7 @@ def binding_profile(g: Generator) -> BindingProfile:
     """Extract :class:`BindingProfile` from one generator's §32 constraints.
 
     Single-leg unit-coefficient constraints are folded per leg into a ``(lo, hi)``
-    interval (mirroring the consumer viz's ``_leg_card_by_port``): ``>=``/``==`` raise ``lo``,
+    interval (per-leg cardinality bounds): ``>=``/``==`` raise ``lo``,
     ``<=``/``==`` lower ``hi``; a leg with none defaults to 1:1 and is dropped.
     Multi-leg constraints become :attr:`BindingProfile.relations`."""
     by_port: dict = {}  # Port -> [lo, hi]

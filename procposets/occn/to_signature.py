@@ -4,7 +4,7 @@ Maps a mined :class:`markers.OCCN` into the repo's
 ``procposets.cospan.signature.Signature`` (the same datatype the PN/PT/BPMN/CN
 pipeline produces), so OCCN joins the cross-notation comparison.
 
-Construction (matches the paper's §4 OCCN -> cospan and ``RUNNING_EXAMPLE.md``):
+Construction (matches the paper's §4 OCCN -> cospan):
 a generator cospan ``g_{t,(P,S)}`` exists for activity ``t`` and each valid
 context ``(P, S)`` drawn from ``I(t) x O(t)``. We take left ports from an input
 marker group and right ports from an output marker group, keeping only
@@ -90,8 +90,7 @@ def occn_to_signature(occn: OCCN, *, bindings: bool = True) -> Signature:
     constraints on the generator legs: each marker's cardinality ``[cmin,cmax]`` as an
     interval, each shared-key distribution as a partition equality. Pass
     ``bindings=False`` for the **plain** signature -- every leg ``1-1`` and no key
-    constraints -- i.e. the forgetful typed-causal-net reading (the CLI default; see
-    the consumer's ``cpm.signature_cli``)."""
+    constraints -- i.e. the forgetful typed-causal-net reading (the CLI default)."""
     gens: set[Generator] = set()
     activities = set(occn.input_groups) | set(occn.output_groups)
     for t in activities:

@@ -1,6 +1,6 @@
 """Occurrence-net (boundary-rooted labelled DAG) view of a ``NamedMorphism``.
 
-Design: ``CLASS_EXTRACTION.md`` §19. The canonical object for comparing
+The canonical object for comparing
 morphisms *under label projection* is **not** the ``;``/``@`` token tree
 (many-to-one onto the morphism: associativity, interleaving, loop-cut all
 give different trees for one morphism) but the morphism's wiring graph: one

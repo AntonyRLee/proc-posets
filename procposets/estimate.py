@@ -57,7 +57,7 @@ def mixture_law(laws: list[Law], rho: list[float]) -> Law:
 
 def sample_traces(variants: list[Poset], rho: list[float], n: int, rng: random.Random) -> list[Trace]:
     """An i.i.d. event log of n traces from the forward model: variant ~ rho, then a uniform
-    linear extension of its poset (enumeration is fine at sandbox scale; Bubley-Dyer at real scale)."""
+    linear extension of its poset (enumeration is fine at small scale; Bubley-Dyer at real scale)."""
     les = [linear_extensions(P) for P in variants]
     picks = rng.choices(range(len(variants)), weights=rho, k=n)
     return [rng.choice(les[j]) for j in picks]

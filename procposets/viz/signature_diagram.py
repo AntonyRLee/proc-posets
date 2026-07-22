@@ -1,6 +1,6 @@
-"""String-diagram visualisers, in the spirit of the companion sim/ package
-(`cpm/vis.py` matplotlib string diagrams + `cpm/cospan/dag_render.py` gamma1->gamma2 DAGs;
-generator-cospan boundary ports are (src, type, tgt) triples, cf. re_cn_cospans.tex).
+"""String-diagram visualisers
+(matplotlib string diagrams + gamma1->gamma2 DAGs;
+generator-cospan boundary ports are (src, type, tgt) triples).
 
 Two products for a model (a weighted set of normal-form posets):
   signature_catalogue(model, ...)  -- the generator-cospan signature Sigma: EACH activity generator
@@ -11,7 +11,7 @@ Two products for a model (a weighted set of normal-form posets):
   render_morphisms(model, ...)     -- the gamma1 -> gamma2 morphisms the model allows: each normal
                                       form as a left-to-right occurrence DAG.
 
-matplotlib only (no graphviz binary needed). Colours/box style follow cpm/vis.py.
+matplotlib only (no graphviz binary needed).
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from ..distance import _augment, smd
 from ..matrix import END, START, build
 from ..poset import Poset
 
-# palette (centralized in viz/palette.py) / geometry from cpm/vis.py
+# palette (centralized in viz/palette.py)
 from .palette import BOUNDARY_GREY as _BOUNDARY  # gamma1 / gamma2 boundary points
 from .palette import COTTON_BLUE as _COTTON  # activities / wires
 from .palette import OLD_BLACK as _BLACK

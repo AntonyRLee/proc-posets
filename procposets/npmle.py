@@ -58,7 +58,7 @@ from .oracle import Oracle
 
 def _moment_seed_atom(oracle: Oracle, log: GroupedLog, init_order) -> int:
     """Row index into ``oracle.logF`` to seed column generation from, chosen
-    by the M9 moment initialiser (see `poset_mixture.initialiser`).  Ranks
+    by the M9 moment initialiser (see `procposets.initialiser`).  Ranks
     the distinct candidate posets by order-``init_order`` precedence-moment
     alignment to the data, then returns the best-fitting nuisance atom of the
     top-ranked poset.  Warm start only -- the convex optimum is unchanged."""
@@ -182,7 +182,7 @@ _ENTERING_WEIGHT = 1e-3    # weight a newly column-generated atom enters at; the
 #                            below this or an entering atom is pruned before that
 #                            step (see the fit() validation).
 _REPRICE_ITERS = 20        # inner tightening rounds before re-pricing a repeated
-#                            best atom (DESIGN_REVIEW W14)
+#                            best atom
 _REPRICE_GAP_RATIO = 0.1   # tighten the restricted solve to this fraction of gap_tol
 
 
@@ -248,14 +248,14 @@ def fit(
     entering weight would prune every new atom before its corrective step
     and spin silently to ``max_iters``.
 
-    ``init_order`` selects the *optional moment initialiser* (ROADMAP M9): an
+    ``init_order`` selects the *optional moment initialiser*: an
     int (2, 3, ...) or ``"auto"`` seeds column generation from the candidate
     poset whose order-``k`` precedence-moment best matches the data, instead
     of the default single-best-likelihood atom.  This is a **compute/quality
     dial, not an identifiability parameter** -- the NPMLE is convex over the
     fixed candidate class, so the fitted optimum is identical for every
-    ``init_order`` (`docs/miners_as_npmle_specialisations.md` §8; see
-    `poset_mixture.initialiser`).  It only changes the warm start, and pays
+    ``init_order`` (see
+    `procposets.initialiser`).  It only changes the warm start, and pays
     off in the large-``m`` regime where per-candidate likelihood is the
     cost.  ``None`` (default) keeps the likelihood-argmax seed."""
     if not 0.0 <= weight_floor < _ENTERING_WEIGHT:
@@ -306,7 +306,7 @@ def fit(
         if k_new in active:
             # The best atom is already active while gap > gap_tol: the restricted
             # problem is unconverged and the oracle re-priced the same atom.
-            # Tighten the fixed-support solve, then re-price (DESIGN_REVIEW W14).
+            # Tighten the fixed-support solve, then re-price.
             w, ll, k_new, score, gap = _tighten_restricted(
                 oracle, logF_active, w, gap_tol)
             history[-1] = (ll, gap)

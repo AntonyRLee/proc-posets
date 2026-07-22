@@ -28,7 +28,7 @@ class PosetClass:
 
     A class declares two capability flags the oracle dispatches on -- these
     document exactly what the meet-closure reduction theorem needs, instead
-    of encoding it as pointer identity (DESIGN_REVIEW W18):
+    of encoding it as pointer identity:
 
     * ``contains_all_posets`` -- every partial order on the alphabet is in
       the class (so a sup over the class is a sup over all posets);
@@ -120,8 +120,8 @@ SP = SPPosets()
 def get_poset_class(spec):
     """Resolve a class spec: "general" | "sp" | a PosetClass instance.
 
-    Arbitrary objects are rejected with the missing protocol members named
-    (DESIGN_REVIEW W21): a class that reaches the oracle unvalidated would
+    Arbitrary objects are rejected with the missing protocol members named:
+    a class that reaches the oracle unvalidated would
     fail deep inside atom construction, or worse, silently mis-dispatch.
     """
     if isinstance(spec, str):

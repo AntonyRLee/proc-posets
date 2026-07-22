@@ -101,7 +101,7 @@ class TraceCheck:
     only_in_2: frozenset
 
 
-def _activity_pomsets(sig: Signature, max_traces: int = 5000) -> frozenset:
+def activity_pomsets(sig: Signature, max_traces: int = 5000) -> frozenset:
     """Bounded sample of the partial-order language: enumerate composable
     generator chains start-to-end and record the resulting activity-precedence
     relation (a Hasse-style frozenset of label pairs).  Approximate by design.
@@ -131,5 +131,5 @@ def _activity_pomsets(sig: Signature, max_traces: int = 5000) -> frozenset:
 
 
 def trace_language_check(s1: Signature, s2: Signature) -> TraceCheck:
-    p1, p2 = _activity_pomsets(s1), _activity_pomsets(s2)
+    p1, p2 = activity_pomsets(s1), activity_pomsets(s2)
     return TraceCheck(p1 == p2, p1 - p2, p2 - p1)

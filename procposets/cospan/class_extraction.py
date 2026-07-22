@@ -3,9 +3,8 @@ discover the named composite morphisms -- atomic generators plus
 hierarchically-discovered loop structures -- that participate in closing a
 boundary (e.g. gamma1 -> gamma2).
 
-Design and rationale: ``sim/CLASS_EXTRACTION.md`` (settled before this was
-written; this module implements that file's S7 algorithm, plus one design
-finding made during implementation -- see "zero-left generators" below).
+This module implements the S7 algorithm, plus one design finding made
+during implementation -- see "zero-left generators" below.
 
 Frontiers are multisets of ``Port`` (``collections.Counter``), not sets --
 future signatures may have multiplicity >1 boundaries even though today's
@@ -202,8 +201,8 @@ class _Status(Enum):
 
 class TooManyFrontiers(RuntimeError):
     """Raised when the search visits more distinct frontiers than the
-    configured safety cap -- a deliberate, controlled failure (see
-    ``CLASS_EXTRACTION.md`` S4/S5) rather than an open-ended hang."""
+    configured safety cap -- a deliberate, controlled failure rather than
+    an open-ended hang."""
 
 
 @dataclass
@@ -213,7 +212,7 @@ class ExtractionResult:
     frontiers_visited: int
     truncated: bool = False  # True iff a per-state iso-class cap was hit (the
     # signature's loop-free closing catalogue is larger than enumerated -- the
-    # "this net over-generates" signal, CLASS_EXTRACTION.md S22; e.g. an OCPN
+    # "this net over-generates" signal; e.g. an OCPN
     # with independent per-type subnets whose execution space is a free product)
 
     def closing(self) -> list[NamedMorphism]:
@@ -230,7 +229,7 @@ class ExtractionResult:
 
 
 # ``extract_classes`` is the pomset-DP, iso-class-quotiented extractor
-# (``CLASS_EXTRACTION.md`` §22), defined in ``extract_dp.py``. The legacy
+# defined in ``extract_dp.py``. The legacy
 # path-enumerating DFS that lived here -- whose ``exits_to_root`` replay both
 # dropped ``M(1,trop)`` and, once corrected, blew up combinatorially on
 # concurrent generators (§21) -- has been removed in favour of the categorical

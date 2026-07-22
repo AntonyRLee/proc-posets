@@ -2,7 +2,7 @@
 (produced by ``class_extraction.extract_classes``) into ``M(m,sigma)``-style
 families by an up-to-port-renaming equivalence.
 
-Design: ``CLASS_EXTRACTION.md`` S12. This module runs strictly *after* the
+This module runs strictly *after* the
 live search has finished, never feeding back into ``_enabled``/``_fire`` --
 the search stays exact (sound, no spurious composites); only the
 *recognition* that two already-discovered, already-sound bodies are
@@ -122,7 +122,7 @@ def schema_classes(
 ) -> dict[tuple, list[NamedMorphism]]:
     """Group every fragment by :func:`shape_key`. Most classes will be
     singletons -- a fragment with no sibling elsewhere in the catalogue is
-    the expected, honest outcome (cf. ``CLASS_EXTRACTION.md`` §9c)."""
+    the expected, honest outcome."""
     groups: dict[tuple, list[NamedMorphism]] = {}
     for nm in fragments.values():
         key = shape_key(nm.body, nm.boundary, fragments)

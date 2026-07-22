@@ -2,8 +2,8 @@
 
 Decision D6: implement the *published* pseudocode (per-activity markers from the
 event-ordering causal heuristic + same-type key unification + min/max
-cardinalities), NOT the reference's set-partition key enumeration
-(OCCN_DEV.md §8, Divergence 2). We therefore expect the marker *key labels* to
+cardinalities), NOT the reference's set-partition key enumeration. We
+therefore expect the marker *key labels* to
 differ from the reference even when the marker *structure* agrees.
 
 Pipeline (per the paper):

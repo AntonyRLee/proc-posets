@@ -134,14 +134,14 @@ def test_pure_cospan_algebra_is_graph_free():
 
 
 def test_touching_the_graph_layer_pulls_networkx():
-    # Non-vacuity witness for both graph-free negatives above.  `equivalence`
-    # certifies the stdlib-core guard; `cospan.occurrence` is a direct sibling
-    # of the B0 algebra, so it pins the (non-obvious) cospan-algebra guard.
-    # Needs the [graph] extra, so skip cleanly on a minimal install; the
-    # measurement itself still runs in a fresh subprocess.
+    # Non-vacuity witness for both graph-free negatives above.
+    # `cospan.equivalence` certifies the stdlib-core guard; `cospan.occurrence`
+    # is a direct sibling of the B0 algebra, so it pins the (non-obvious)
+    # cospan-algebra guard.  Needs the [graph] extra, so skip cleanly on a
+    # minimal install; the measurement itself still runs in a fresh subprocess.
     pytest.importorskip("networkx")
-    assert _fresh_import_pulls("import procposets.equivalence", "networkx"), (
-        "the [graph] layer (equivalence) must pull networkx"
+    assert _fresh_import_pulls("import procposets.cospan.equivalence", "networkx"), (
+        "the [graph] layer (cospan.equivalence) must pull networkx"
     )
     assert _fresh_import_pulls(
         "import procposets.cospan.occurrence", "networkx"

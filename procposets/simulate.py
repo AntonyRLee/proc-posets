@@ -1,7 +1,7 @@
-"""Ground-truth simulators for the demos.
+"""Ground-truth simulators for grouped logs.
 
 Generates grouped logs from an SP-poset mixture with the two noise channels
-of the model, plus a coarse-key generator for the inferred-groups demo:
+of the model, plus a coarse-key generator for inferred-group recovery:
 
 * eps_sim -- recording noise: with this probability a trace suffers one
   uniformly chosen adjacent transposition (a realistic logging error that the

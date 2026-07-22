@@ -23,7 +23,7 @@ START = "START"
 END = "END"
 
 
-def _block_sequence(tree) -> list[str]:
+def block_sequence(tree) -> list[str]:
     """Ordered atomic block labels of one normal form (series -> chain; else a single block)."""
     if isinstance(tree, Series):
         return [c.canonical() for c in tree.parts]  # series parts are atomic (mod. decomp. flattens)
@@ -33,12 +33,12 @@ def _block_sequence(tree) -> list[str]:
 def build(model: list[tuple[Poset, float]], context_depth: int = 1):
     """Return (matrix, states). matrix[src] = {dst: prob}; states are order-`context_depth` block
     contexts ('|'-joined last <=k blocks) plus the bare sentinels START, END. context_depth=1 is
-    the memoryless block chain (default; identical matrices to the pre-VLMC sandbox)."""
+    the memoryless block chain (default; identical matrices to the pre-VLMC implementation)."""
     k = max(1, context_depth)
     raw: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     states: set[str] = {START, END}
     for P, w in model:
-        blocks = _block_sequence(decompose(P))
+        blocks = block_sequence(decompose(P))
         prev = START
         for i in range(len(blocks)):
             cur = "|".join(blocks[max(0, i - k + 1):i + 1])   # last <=k blocks

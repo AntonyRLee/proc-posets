@@ -5,7 +5,7 @@ smd  -- Result 3 of the distance paper: the stochastic-matrix distance on the bl
 bhattacharyya_angle -- Result 1: the Bhattacharyya angle on the flat normal-form distribution.
         Compares Markov *states* (a vector). Brittle: any distinct normal form is maximally far.
 
-The contrast between the two on the same pair of models is the point of the sandbox.
+The contrast between the two on the same pair of models is the point of this comparison.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .poset import Model
 
 Mode = Literal["sink", "selfloop"]  # matrix-normalisation on the common state space
 
-# Matrix normalisation on the common state space (docs/DESIGN-comparison-object.md, TODO §8):
+# Matrix normalisation on the common state space:
 #   "selfloop" (option 1) -- unused state s -> s; END -> END (absorbing). Distance-paper convention.
 #   "sink"     (option 2) -- unused state s -> END (=gamma2); END -> START (=gamma1) reset, so the
 #                            matrix is a genuine gamma1->gamma2 generative chain with a steady state.
@@ -82,7 +82,7 @@ def smd_rows(built1, built2, mode: Optional[Mode] = None, normalize: bool = Fals
              states: Optional[list[str]] = None) -> tuple[float, dict[str, float]]:
     """SMD between two already-BUILT (matrix, states) pairs -- for reusing builds, or for
     comparing against a hand-built chain that no finite variant set produces (e.g. the cyclic
-    loop limit of `spm.loops.loop_limit`).
+    loop limit of `loops.loop_limit`).
 
     `normalize` divides by sqrt(|X|) -- the distance paper's Result-4 factor (Eq. D4):
     d/sqrt(|X|) is the ROOT-MEAN-SQUARE Bhattacharyya angle over the rows, bounded in [0, pi]

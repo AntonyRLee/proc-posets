@@ -219,8 +219,7 @@ def meet_closure(rels: Iterable[Rel], cap: int = 200_000) -> Tuple[List[Rel], bo
     closed = set(rels)
     # frontier and base iterate in canonical sorted order so that a cap hit
     # truncates deterministically -- hash order made the kept subset vary
-    # with PYTHONHASHSEED, making the downgraded regime irreproducible
-    # (DESIGN_REVIEW W12.4)
+    # with PYTHONHASHSEED, making the downgraded regime irreproducible.
     frontier = sorted(closed, key=_canonical_key)
     hit_cap = False
     while frontier and not hit_cap:

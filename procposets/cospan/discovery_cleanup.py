@@ -4,10 +4,10 @@ upstream of `class_extraction.extract_classes`, not in the post-hoc
 `morphism_schema`/`signature_diff` layers (which only ever see whatever the
 signature already contains).
 
-Promoted from ``ocpn_dev/extract_signatures.py`` (originally written for the
+Promoted from an OCPN-specific signature extractor (originally written for the
 mined OCPN signature only, but the check itself never assumed anything
 OCPN-specific) when the same artifact showed up as a literal generator in a
-cross-signature diff (``CLASS_EXTRACTION.md`` §14, bucket B4).
+cross-signature diff.
 """
 
 from __future__ import annotations
@@ -28,10 +28,9 @@ def forget_provenance(sig: Signature) -> Signature:
     behaviour and are merged. The result keeps **activity-referenced**
     boundaries (``tgt`` is a consumer activity, shared across notations), so
     cross-notation comparison still works -- this is the comparison-granularity
-    quotient, *not* the rejected place-identity boundary
-    (``CLASS_EXTRACTION.md`` §21e/§22c).
+    quotient, *not* the rejected place-identity boundary.
 
-    Effect (``CLASS_EXTRACTION.md`` §22): on a mined OCPN it collapses the
+    Effect: on a mined OCPN it collapses the
     predecessor-provenance cross-product that the engine's fine
     ``(src,typ,tgt)`` ports generate (ED OCPN 2514 -> 270 generators) and lets
     the discovered loop close as a real cycle instead of spiralling through
@@ -178,8 +177,7 @@ def close_gamma2_termini(sig: Signature, *, gamma2: str = "gamma2") -> Signature
 
 
 def degenerate_filtered(sig: Signature) -> Signature:
-    """Drop degree-(1,1) self-bounce contexts (``demos/01_ed_chest_pain/
-    MINED_COSPANS.md`` §2).
+    """Drop degree-(1,1) self-bounce contexts.
 
     An activity is degree-(1,1) if every one of its generators has exactly
     one left port and one right port. For such an activity, a context is a
@@ -190,7 +188,7 @@ def degenerate_filtered(sig: Signature) -> Signature:
     e.g. one whose generators always carry several simultaneous ports --
     is never degree-(1,1) in the first place, so this filter cannot remove
     a real self-loop; confirmed directly against ground truth for the ED
-    OCEL in CLASS_EXTRACTION.md §14: `re_examine`'s self-loop generators all
+    OCEL: `re_examine`'s self-loop generators all
     carry 3 ports and survive; `troponin_neg`'s lone degree-(1,1) self-loop
     generator, which never appears as a literal adjacent repeat anywhere in
     the underlying log, does not.)

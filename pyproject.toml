@@ -4,12 +4,32 @@ version = "0.1.0"
 description = "Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research."
 readme = "README.md"
 requires-python = ">=3.10"          # verified: no first-party source in any consumer repo uses >3.10 syntax
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Antony Lee", email = "antony.lee@gmail.com" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Typing :: Typed",
+]
+
 # NO hard runtime dependency: `import procposets` and the whole stdlib core
 # (poset algebra, decomposition, traces, stochastic-matrix distance, known-law
 # EM) pull nothing third-party.  numpy / networkx / pm4py / matplotlib are all
 # opt-in extras below; the numpy-backed NPMLE estimator loads lazily (PEP 562
 # __getattr__ in __init__), so touching it is what pulls numpy.
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/AntonyRLee/proc-posets"
+Repository = "https://github.com/AntonyRLee/proc-posets"
 
 # Lower bounds are kept 3.10-installable so the >=3.10 floor (required for the
 # NPMLE path-dep) still yields a resolvable universal lock: uv fork-resolves
