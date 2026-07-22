@@ -9,3 +9,15 @@ dist/
 procposets/**/*.zip
 procposets/**/*.md
 sandbox/
+
+# tooling caches
+.ruff_cache/
+.mypy_cache/
+
+# dev-session journals & internal planning — kept local, out of the public tree
+# (the wheel already excludes *.md; this keeps them out of the repo/sdist too)
+/NEXT-SESSION-*.md
+/TODO.md
+docs/NEXT-SESSION-*.md
+docs/MIGRATION-PLAN.md
+docs/2026-*.md

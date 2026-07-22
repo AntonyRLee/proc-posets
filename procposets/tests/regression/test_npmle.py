@@ -593,7 +593,7 @@ def test_refit_full_class_gap():
     # chain data + chain leftovers: nothing in the class wants in
     assert upgraded.full_class_gap is not None
     assert -1e-9 <= upgraded.full_class_gap <= 1e-2
-    assert f"full-class gap" in upgraded.summary()
+    assert "full-class gap" in upgraded.summary()
 
 
 def test_oracle_downgrades_on_ideal_budget(monkeypatch):

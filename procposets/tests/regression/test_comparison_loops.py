@@ -1,5 +1,4 @@
 """The loop machinery: truncated unrollings, the cyclic limit chain, and their convergence."""
-import math
 import random
 
 from procposets.distance import smd, smd_rows
