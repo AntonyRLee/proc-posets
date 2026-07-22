@@ -28,7 +28,7 @@ import pm4py
 
 from .adapters.from_bpmn import lmgraph_from_bpmn_diagrams
 from .cospan.from_heuristics import lmgraph_from_heuristics_nets
-from .cospan.from_ocpn import lmgraph_from_ocpn
+from .cospan.from_ocpn import signature_from_ocpn as _signature_from_ocpn
 from .cospan.from_petri import lmgraph_from_petri_nets
 from .adapters.from_process_tree import lmgraph_from_process_trees
 from .cospan.discovery_cleanup import forget_provenance
@@ -100,7 +100,8 @@ def signature_from_ocpn(ocel) -> Signature:
     # surface_termini: the OCPN is the object-centric net whose full final marking matters --
     # an object that ends at a transition's final place (the ``s`` carrier) becomes a
     # ``gamma2`` leg, matching the OCCN's ``END_<ot>`` and the master's ``gamma2`` carrier.
-    return extract_signature(lmgraph_from_ocpn(ocpn), surface_termini=True)
+    # Delegate the lmgraph_from_ocpn + extract pipeline to its single home in from_ocpn.
+    return _signature_from_ocpn(ocpn, surface_termini=True)
 
 
 def signature_from_occn(ocel, *, bindings: bool = True) -> Signature:
@@ -130,7 +131,7 @@ def discover_model(ocel, cls: str):
         return occn, occn_to_signature(occn)
     if cls == "OCPN":
         ocpn = pm4py.discover_oc_petri_net(ocel)
-        return ocpn, extract_signature(lmgraph_from_ocpn(ocpn), surface_termini=True)
+        return ocpn, _signature_from_ocpn(ocpn, surface_termini=True)
     return None, discover_signatures(ocel, object_centric=False).get(cls)
 
 

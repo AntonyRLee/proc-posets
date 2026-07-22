@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import networkx as nx
 
+from ._lmgraph_build import _assemble, _assemble_single, _type_prefix
 from .lmgraph import Kind, LMGraph
 
 
@@ -57,7 +58,7 @@ def add_heuristics(g: LMGraph, hn, otype: str | None) -> None:
     ``otype``. Mediators are namespaced by ``otype``; activities are shared
     by label, as in :mod:`from_petri`.
     """
-    pre = f"{otype}__" if otype is not None else ""
+    pre = _type_prefix(otype)
     nodes = hn.nodes
 
     def out_id(name: str) -> str:
@@ -109,16 +110,9 @@ def add_heuristics(g: LMGraph, hn, otype: str | None) -> None:
 
 def lmgraph_from_heuristics_nets(nets_by_type: dict) -> LMGraph:
     """Build one typed object-centric LM-graph from ``{otype: HeuristicsNet}``."""
-    g = LMGraph()
-    for otype, hn in nets_by_type.items():
-        add_heuristics(g, hn, otype)
-    g.validate()
-    return g
+    return _assemble(add_heuristics, nets_by_type)
 
 
 def lmgraph_from_heuristics(hn, otype: str | None = None) -> LMGraph:
     """Single (optionally untyped) HeuristicsNet -> LM-graph."""
-    g = LMGraph()
-    add_heuristics(g, hn, otype)
-    g.validate()
-    return g
+    return _assemble_single(add_heuristics, hn, otype)

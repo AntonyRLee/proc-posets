@@ -32,13 +32,11 @@ import random
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-import pandas as pd
 from pm4py.objects.ocel.obj import OCEL
 
+from ._ocel import _ocel_from_rows
 from .signature import Generator, Port, Signature
 
-EID, ACT, TS = "ocel:eid", "ocel:activity", "ocel:timestamp"
-OID, OTYPE = "ocel:oid", "ocel:type"
 _BASE = datetime(2026, 1, 1)
 _STEP = timedelta(minutes=5)
 
@@ -272,7 +270,4 @@ def faithful_ocel_from_signature(
                 for oid in objs[ot]:
                     rows.append((e, activity, ts, oid, ot))
 
-    rel = pd.DataFrame(rows, columns=[EID, ACT, TS, OID, OTYPE])
-    events = rel[[EID, ACT, TS]].drop_duplicates().reset_index(drop=True)
-    objects = rel[[OID, OTYPE]].drop_duplicates().reset_index(drop=True)
-    return OCEL(events=events, objects=objects, relations=rel)
+    return _ocel_from_rows(rows)

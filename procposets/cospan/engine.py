@@ -179,6 +179,36 @@ def backward_bundles(g: LMGraph, a: str) -> BundleSet:
     )
 
 
+def _prepare_extraction(
+    g: LMGraph, remove_silent: bool, surface_termini: bool
+) -> tuple[LMGraph, bool]:
+    """Shared preamble of both signature extractors.
+
+    Drops silent transitions (model -> signature is silent-free by design), and
+    when the model already carries an explicit terminus *activity* (a master spec
+    simulated into a log re-introduces ``gamma2`` as an event; BPMN/OCCN-style
+    ``END_<ot>``) leaves bare-sink termini absorbed -- that activity already is
+    the final marking, so surfacing termini would double it (and collide on the
+    ``gamma2`` label). Returns the (possibly silent-stripped) graph and the
+    (possibly forced-off) ``surface_termini`` flag."""
+    if remove_silent and g.silent:
+        g = g.without_silent()
+    if surface_termini and any(
+        g.lab(a) == GAMMA2 or g.lab(a).startswith("END_") for a in g.activities
+    ):
+        surface_termini = False
+    return g, surface_termini
+
+
+def _gen_from_bundles(lab: str, P, S) -> Generator:
+    """Assemble one :class:`Generator` from a backward bundle ``P`` (left legs)
+    and a forward bundle ``S`` (right legs) -- the construction tail shared by
+    both extractors."""
+    left = frozenset(Port(p, t, lab) for (p, t) in P)
+    right = frozenset(Port(lab, t, s) for (s, t) in S)
+    return Generator(lab, left, right)
+
+
 def extract_signature(
     g: LMGraph, kappa: Kappa | None = None, remove_silent: bool = True,
     *, surface_termini: bool = False,
@@ -206,16 +236,7 @@ def extract_signature(
     activities are unconstrained, which is the prior behaviour and what the
     golden running-example test exercises.  (Type-preservation at *mediators* is
     enforced separately and unconditionally by ``LMGraph.validate``.)"""
-    if remove_silent and g.silent:
-        g = g.without_silent()
-    if surface_termini and any(
-        g.lab(a) == GAMMA2 or g.lab(a).startswith("END_") for a in g.activities
-    ):
-        # the model already carries an explicit terminus *activity* (a master spec
-        # simulated into a log re-introduces ``gamma2`` as an event; BPMN/OCCN-style
-        # ``END_<ot>``): that activity already is the final marking, so surfacing bare-sink
-        # termini would double it (and collide on the ``gamma2`` label). Leave them absorbed.
-        surface_termini = False
+    g, surface_termini = _prepare_extraction(g, remove_silent, surface_termini)
     gens: set[Generator] = set()
     for a in sorted(g.activities):
         lab = g.lab(a)
@@ -225,7 +246,5 @@ def extract_signature(
             for S in F:
                 if kappa is not None and not admissible(lab, P, S, kappa):
                     continue
-                left = frozenset(Port(p, t, lab) for (p, t) in P)
-                right = frozenset(Port(lab, t, s) for (s, t) in S)
-                gens.add(Generator(lab, left, right))
+                gens.add(_gen_from_bundles(lab, P, S))
     return Signature(frozenset(gens))
