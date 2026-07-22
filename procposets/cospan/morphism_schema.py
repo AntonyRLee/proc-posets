@@ -91,20 +91,28 @@ def shape_key(body: tuple, boundary: FrontierKey, by_name: dict[str, NamedMorphi
         left_wires_per_gen: list[list[tuple]] = []
         for g in frame:
             wires = []
-            for p, n in Counter(g.left).items():
-                for _ in range(n):
+            # §38 grounding: a leg carries g.weight(p) objects, so it consumes
+            # that many wires (left/right are frozensets, so a port never repeats
+            # -- the count is the leg weight, not 1). Byte-identical for ungrounded
+            # (weight-1) generators; mirrors the live search's _left_weighted so a
+            # grounded fragment gets a consistent, correctly-arity'd shape key.
+            for p in g.left:
+                for _ in range(g.weight(p)):
                     tag = pool[p].pop(0)
                     wires.append((_typ_key(p.typ), tag))
             left_wires_per_gen.append(sorted(wires))
 
         right_types_per_gen: list[tuple] = []
         for slot, g in enumerate(frame):
-            for p, n in Counter(g.right).items():
+            for p in g.right:
                 pool.setdefault(p, [])
-                for _ in range(n):
+                for _ in range(g.weight(p)):
                     pool[p].append(_step_tag(f_idx, slot))
+            rt: Counter = Counter()
+            for p in g.right:
+                rt[p.typ] += g.weight(p)
             right_types_per_gen.append(
-                tuple(sorted((_typ_key(typ), n) for typ, n in Counter(p.typ for p in g.right).items()))
+                tuple(sorted((_typ_key(typ), n) for typ, n in rt.items()))
             )
 
         frame_descs.append(

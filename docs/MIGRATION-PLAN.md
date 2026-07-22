@@ -123,22 +123,26 @@ Risk tags (from the refactor plan): `none` (docstring/comment) · `value-preserv
 - [x] **4.3 Add a release-gate grep** — DONE 2026-07-22 (`procposets/tests/test_release_gate.py`):
   scans the shipping tree (package source minus `tests/`) and fails on `/home/arl`, `sim/cpm`,
   the three consumer repo names, and the consumer-doc filenames. Currently green. `none`
-- [ ] **4.4 Merge `output-sensitive-extract-signature` → `main`** — everything above assumes the
-  refactor is mainline; it currently isn't. (Owner decision.) `none`
-- [~] **4.5 (open Phase-0 latents)** — PARTIAL 2026-07-22. **Import side effect DONE (value-preserving):**
-  `adapters/outbound.py` no longer calls a module-level `warnings.filterwarnings("ignore")` (which
-  silenced warnings process-wide for anyone importing the [pm4py] layer); scoped to just the pandas/pm4py
-  imports via `warnings.catch_warnings()`. **DEFERRED pending owner sign-off** (they change research
-  numerics + the frozen regression goldens, so not touched unilaterally):
-    1. `compose.py` LoopBox dedup — the `seen`-key may not distinguish LoopBox placements, so composites
-       differing only in a loop box can wrongly dedup (or fail to).
-    2. `morphism_schema.py` — a `Counter(g.left)`/`Counter(g.right)` reads port multiplicity but a
-       boundary tally may be unweighted where it should carry `c`.
-    3. `simulate.py:91` `alphabet = sorted(mix.trees[0].elements())` — the sampler takes the alphabet
-       from ONLY the first mixture component; components with a different element set lose elements.
-  Also **DEFERRED (environmental):** `viz/signature_diagram.py:20` `matplotlib.use("Agg")` forces the
-  backend at import (overrides a consumer's choice); removing it risks breaking headless demos, so leave
-  for a deliberate call. `changes-values` / `value-preserving`
+- [x] **4.4 Merge to `main` + push (all repos)** — DONE 2026-07-22. The refactor had already landed on
+  procposets `main` via PR #1/#2 (done on GitHub outside the session); the **migration** merged via
+  **PR #3** (`self-containment-sweep`→`main`, merge commit `0339120`). Pushed: procposets
+  `main`+`self-containment-sweep`; sim `arl/sosym`; PMN `main`+`arl/alias-cutover`; SPM `arl/main`.
+  All fast-forward / clean-merge (no force). NB the SPM remote reports it **moved** to
+  `stochastic-comparison-process-mining.git` (push succeeded via redirect; update the remote URL). `none`
+- [x] **4.5 (open Phase-0 latents)** — DONE 2026-07-22. All five triaged by an adversarial read-only
+  workflow (`wf_75c139dc-969`) and fixed byte-exact against the current suites (337/209/201/54):
+    0. `adapters/outbound.py` process-wide `warnings.filterwarnings("ignore")` → scoped to the
+       pandas/pm4py imports via `warnings.catch_warnings()` (`51268d4`).
+    1. `compose.py` LoopBox dedup (real latent bug, one-way over-production): the loop-truncation branch
+       bypassed `seen`; now keyed on `sorted(str(g) for placed) + sentinel + loop body`. New regression
+       test `test_cpm_compose_loop_dedup`. Loop-free enumeration unchanged.
+    2. `morphism_schema.shape_key` leg tallies now weight by `g.weight(p)` (the literal "repeated port"
+       worry was moot — legs are `frozenset[Port]`; the real gap was the §38 weight asymmetry vs the
+       boundary side). Byte-identical for unit-weight.
+    3. `simulate.py` timed sampler derives the alphabet PER component (matching the untimed sibling),
+       not from `trees[0]`. Byte-identical for shared-alphabet mixtures.
+    4. `matplotlib.use("Agg")` removed from BOTH `viz/signature_diagram.py` and `viz/compare_vis.py`
+       (matching `string_diagram.py`); no value/golden impact. `changes-values`→byte-exact / DONE
 
 ### NOT procposets' concern (push to the geometry-paper repo)
 Split-Miner anomaly investigation · supplement reproduction commands · the Zenodo DOI "to pin in the

@@ -157,9 +157,23 @@ def _extend(
 
     for g in candidates:
         if placed.count(g) >= unroll:
-            results.append(
-                CompositeDiagram(tuple(placed) + (LoopBox(_loop_body(placed, g)),))
+            box = LoopBox(_loop_body(placed, g))
+            # LoopBox composites must honour the same interleaving-dedup as
+            # completed ones (module docstring / label_multiset_key): AND-concurrent
+            # interleavings of the same pre-loop generators that truncate on the same
+            # loop body are the same diagram. Key on the placed-generator multiset
+            # (str(g) basis, matching the completion path above) plus the *ordered*
+            # loop body, namespaced with a sentinel so it can never collide with a
+            # completion key. Direction was previously one-way over-production: this
+            # branch never touched ``seen``.
+            key = (
+                tuple(sorted(str(x) for x in placed))
+                + ("<loop>",)
+                + tuple(str(b) for b in box.body)
             )
+            if key not in seen:
+                seen.add(key)
+                results.append(CompositeDiagram(tuple(placed) + (box,)))
             continue
         new_available = dict(available)
         for p in g.left:
