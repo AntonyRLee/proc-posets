@@ -12,7 +12,10 @@ this file is the stable, committed reference.)
 Extraction has three nested outputs; only the innermost is expensive:
 
 - **L1 — skeleton**: per activity, the per-arc XOR-alternative bundle families
-  (`skeleton.extract_skeleton`).  A *sum* over arcs: O(model).
+  (`skeleton.extract_skeleton`).  A *sum* over arcs: O(model + per-arc
+  alternatives) — an arc's family is `_traverse`'s output, which AND/OR
+  mediators can grow, so "O(model)" holds for discovered OCPNs (XOR places)
+  but not unconditionally.
 - **L2 — CanonKey set**: what `signature_compare.compare` consumes —
   `(label, per-type in-arity multiset, per-type out-arity multiset)`.
   Bounded by *achievable arity profiles*, not by the model: a hub with k

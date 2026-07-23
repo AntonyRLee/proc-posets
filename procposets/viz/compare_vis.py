@@ -27,12 +27,28 @@ _STATUS_COLOUR = {
 _VERDICT_COLOUR = {"match": "#5a9e4e", "param-diff": "#d8881a", "partial": "#7a7a7a"}
 
 
-def comparison_matrix(report: ComparisonReport, path: str | None = None, *, title: str | None = None):
+def comparison_matrix(report: ComparisonReport, path: str | None = None, *,
+                      title: str | None = None, max_rows: int = 1000):
     """Draw the comparison matrix; save to ``path`` (``.svg``/``.png``) if given and
-    return the Figure."""
+    return the Figure.
+
+    Figure height grows linearly with rows (0.66 units each), so the matrix is
+    only viable for reports up to ~10^3 rows -- beyond ``max_rows`` we raise
+    instead of producing a multi-hundred-MB SVG or exceeding matplotlib's
+    2^16-pixel Agg limit (a wide-OCPN *joint* report can carry tens of
+    thousands of CanonKey rows; the 44-type Bundestag's has 35,009).  For those,
+    compare with ``key="marginal"`` (a per-(activity, side, type) fact per row,
+    ~k facts per side on a k-type hub) or pre-filter the rows."""
     cols = list(report.notations)
     rows = list(report.rows)
     n_cols = len(cols)
+    if len(rows) > max_rows:
+        raise ValueError(
+            f"comparison_matrix: {len(rows)} rows exceeds max_rows={max_rows} -- "
+            "a figure this tall is unusable (and breaks matplotlib's 2^16-px "
+            "limit). Use compare(..., key='marginal') for the factored view, "
+            "or filter the report's rows."
+        )
     # a marginal (per-(activity, side, type) ArityFact) report needs its own
     # chrome: the joint captions would mislabel arity SETS as §32 binding ranges
     marginal = any(isinstance(r.key, MarginalKey) for r in rows)

@@ -198,6 +198,17 @@ def compose_signature(
     A :class:`FactoredSignature` ``sigma`` composes to the same result as its
     materialised form (module docstring): candidates are joined lazily under
     ``><`` at fire-time instead of being drawn from a pre-built ``B x F``.
+
+    **Cost (stated, not capped):** the search explores every firing order and
+    dedups interleavings only at completion, so ``w`` AND-concurrent
+    independent generators cost ``Theta(w!)`` explored paths even when they
+    dedup to one diagram; XOR alternatives multiply branches; each LoopBox
+    truncation adds up to ``unroll`` extra rounds of its body's interleavings.
+    Practical on models whose AND-width stays small (about <= 8); there is
+    deliberately no silent cap -- a run that does not return promptly is a
+    finding about the model's width, not a knob to raise.  (The factored path
+    changes *where candidates come from* -- pool-covered, never ``|B|x|F|`` --
+    not this search-tree bound.)
     """
     if isinstance(sigma, FactoredSignature):
         provider = _FactoredReady(sigma)

@@ -10,16 +10,21 @@ derivation and the wider factored-skeleton architecture this is part of.
 (verified by ``tests/regression/test_cospan_extract_fast.py``).  The speed comes
 from working at the *canon-profile* level, never at the concrete-bundle level.
 
-A CanonKey reads only, per boundary side, the **multiset of endpoint object types**
-(and, when termini are surfaced, whether a leg is a ``gamma2`` terminus) -- never
-*which* concrete predecessor/successor.  So we combine an activity's arcs one at a
-time, carrying not the concrete bundles but the *canon partial-state* -- the
-per-type ``(real, gamma2)`` leg counts so far -- and dedup on it at every step.
-Two partial states with the same per-type counts have identical futures, so the
-state set stays bounded by the number of distinct **profiles**, i.e. by the output,
-never by the ``product-over-arcs`` of concrete endpoint choices.  The Bundestag hub
-``Beratung`` (26 typed arcs, ~15 independently optional) yields its 32,768 profiles
-in seconds where the concrete-bundle product blew up / hung for minutes.
+A CanonKey reads only, per boundary side, the **multiset of endpoint object
+types** (a surfaced terminus contributing its merged per-type count once the
+pure-terminus collapse has been decided) -- never *which* concrete
+predecessor/successor.  So we combine an activity's arcs one at a time in the
+**output space**: the partial state carries, per type, only the merged
+``real + gamma2`` leg count, plus one side-level saturating "has a real leg"
+bit (which decides the pure-terminus collapse) under ``surface_termini`` --
+real counts only under the default strip -- deduping after every fold step.
+Two partial states equal in that reduced form have identical futures, so the
+state set stays bounded by the number of distinct **profiles**, i.e. by the
+output, never by the ``product-over-arcs`` of concrete endpoint choices (nor
+by the raw real-vs-``gamma2`` split space, which can run 16x larger than the
+profile space).  The Bundestag hub ``Beratung`` (26 typed arcs, ~15
+independently optional) yields its 32,768 profiles in under two seconds where
+the concrete-bundle product blew up / hung for minutes.
 
 The terminus handling is folded into the state summary so it matches
 ``engine._strip_termini`` (default: ``gamma2`` legs absorbed) and
@@ -64,9 +69,11 @@ def _side_profiles(g: LMGraph, a: str, *, forward: bool, surface_termini: bool) 
     """Achievable set of canon *profiles* for one boundary side of ``a`` -- each a
     ``frozenset`` of ``(object_type, arity)`` legs (``frozenset()`` = the empty side).
 
-    Combines the side's arcs incrementally, carrying the per-type ``(real, gamma2)``
-    leg counts and deduping on them, so the state set is bounded by the number of
-    distinct profiles (the output), not the concrete ``product-over-arcs``.  Endpoint
+    Combines the side's arcs incrementally in the reduced output space (per-type
+    merged counts + the side-level has-a-real-leg bit under ``surface_termini``,
+    real counts only under strip -- see the module docstring), deduping after
+    every fold, so the state set is bounded by the number of distinct profiles
+    (the output), not the concrete ``product-over-arcs``.  Endpoint
     types are the *resolved* types :func:`engine._traverse` returns (which need not
     equal an arc's declared ``e.typ`` -- e.g. an untyped choice fanning into several
     typed successors), so this is exact for arbitrary LM-graphs, not only clean OCPNs."""
