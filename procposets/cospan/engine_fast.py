@@ -2,9 +2,8 @@
 generator per distinct CanonKey) as :func:`engine.extract_signature`, without
 materialising the cross-type ``|B|x|F|`` product that makes the slow engine
 intractable on wide object-centric nets (a hub shared across ``k`` object types
-blows up exponentially in ``k``).  See
-``docs/2026-07-23-decorated-cospan-extractor-PLAN.md`` for the derivation and the
-wider factored-skeleton plan this is the first step of.
+blows up exponentially in ``k``).  See ``docs/fast-extraction.md`` for the
+derivation and the wider factored-skeleton architecture this is part of.
 
 **Exactness contract.**  The CanonKey set is **byte-identical** to
 :func:`engine.extract_signature` on every fixture the slow engine can reach

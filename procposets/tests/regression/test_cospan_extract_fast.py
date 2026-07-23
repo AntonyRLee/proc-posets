@@ -1,9 +1,9 @@
 """Golden cross-check: ``extract_signature_fast`` (output-sensitive) must emit the
 **same CanonKey set** as the slow ``extract_signature`` on every fixture the slow
 engine can reach -- the migration-discipline seam for the fast extractor
-(docs/2026-07-20-fast-signature-extraction.md). The fast path returns one
-representative generator per CanonKey (no bindings), so we compare the
-``canonical_generators`` keys, which is exactly its stated contract.
+(docs/fast-extraction.md). The fast path returns one representative generator
+per CanonKey (no bindings), so we compare the ``canonical_generators`` keys,
+which is exactly its stated contract.
 """
 
 from __future__ import annotations
@@ -74,6 +74,31 @@ def _typed_hub() -> LMGraph:
     return g
 
 
+def _optional_hub(k: int, m: int) -> LMGraph:
+    """Hub ``H`` with one in-arc per object type ``t1..tk``, each an XOR over
+    ``m`` same-type predecessors AND a bare-source empty alternative (the type
+    is optional) -- the Bundestag-``Beratung`` shape in miniature: the
+    concrete-bundle cross-arc product is ``(m+1)^k`` while the canon-profile
+    state space is ``2^k``."""
+    g = LMGraph()
+    g.add_activity("H")
+    g.add_activity("E")
+    for i in range(1, k + 1):
+        t = f"t{i}"
+        g.add_mediator(f"q{i}", Kind.XOR)
+        g.add_mediator(f"r{i}", Kind.XOR)   # dead-end feeder: the empty alternative
+        g.add_edge(f"r{i}", f"q{i}", t)
+        for j in range(m):
+            g.add_activity(f"P{i}_{j}")
+            g.add_edge(f"P{i}_{j}", f"q{i}", t)
+        g.add_edge(f"q{i}", "H", t)
+    g.add_mediator("he", Kind.XOR)
+    g.add_edge("H", "he", "t1")
+    g.add_edge("he", "E", "t1")
+    g.validate()
+    return g
+
+
 def _canon_keys(sig) -> set:
     return set(canonical_generators(sig).keys())
 
@@ -136,6 +161,34 @@ def test_typed_hub_has_single_canonkey_for_hub():
     assert len(hub_keys) == 1
     fast_hub = {k for k in _canon_keys(extract_signature_fast(g)) if k.label == "H"}
     assert fast_hub == hub_keys
+
+
+def test_wide_optional_hub_stays_output_sensitive():
+    """The wide-OCPN hang guard: k=12 optional types x m=4 alternatives give a
+    ``5^12 ~ 2.4e8`` concrete-bundle cross-arc product -- a regression of the
+    fast path back to concrete-bundle products hangs the suite budget -- while
+    the canon-profile space is ``2^12 = 4096``, done in milliseconds.  The
+    same shape is cross-checked exactly against the slow engine at k=6/m=2
+    (``3^6 = 729`` concrete bundles, still cheap)."""
+    _assert_same_canonkeys("optional_hub_small", lambda: _optional_hub(6, 2), {})
+    fast = _canon_keys(extract_signature_fast(_optional_hub(12, 4)))
+    assert len({k for k in fast if k.label == "H"}) == 2 ** 12
+
+
+def test_signature_from_ocpn_defaults_to_canonical():
+    """The flip: ``signature_from_ocpn``'s default is the output-sensitive
+    canonical extractor (cannot hang on a wide net), byte-equal to an explicit
+    ``canonical=True`` and distinct from the full extraction (whose generators
+    carry concrete neighbour ports, not canonical placeholders).  Behaviour-
+    level consumers opt out via ``canonical=False`` (``discover.py`` pins it)."""
+    from procposets.cospan.engine_fast import extract_signature_fast as fast
+    from procposets.cospan.from_ocpn import lmgraph_from_ocpn
+
+    ocpn = _fake_ocpn()
+    default = signature_from_ocpn(ocpn)
+    assert default == signature_from_ocpn(ocpn, canonical=True)
+    assert default == fast(lmgraph_from_ocpn(ocpn))
+    assert default != signature_from_ocpn(ocpn, canonical=False)
 
 
 def test_signature_from_ocpn_canonical_matches_full():

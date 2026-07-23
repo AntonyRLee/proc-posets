@@ -90,18 +90,26 @@ def signatures_from_raw(raw: dict[str, dict[str, object]]) -> dict[str, Signatur
     }
 
 
-def signature_from_ocpn(ocel) -> Signature:
+def signature_from_ocpn(ocel, *, canonical: bool = False) -> Signature:
     """Signature of the *discovered object-centric Petri net* itself.
 
     Unlike the ``PN`` class (which re-discovers a per-type inductive net per
     flattened log), this reads ``pm4py.discover_oc_petri_net``'s OCPN object
-    directly via :func:`.cospan.from_ocpn.lmgraph_from_ocpn`."""
+    directly via :func:`.cospan.from_ocpn.lmgraph_from_ocpn`.
+
+    ``canonical`` defaults ``False`` here (unlike the underlying
+    :func:`.cospan.from_ocpn.signature_from_ocpn`): established consumers of
+    this entry point feed the result to the splice/behavioural machinery
+    (``extract_classes``), which needs the full concrete-port signature -- the
+    migration-discipline byte-for-byte contract pins that.  Pass
+    ``canonical=True`` for the CanonKey-level views (compare, inventory,
+    localisation) on wide OCPNs, where the full extraction is intractable."""
     ocpn = pm4py.discover_oc_petri_net(ocel)
     # surface_termini: the OCPN is the object-centric net whose full final marking matters --
     # an object that ends at a transition's final place (the ``s`` carrier) becomes a
     # ``gamma2`` leg, matching the OCCN's ``END_<ot>`` and the master's ``gamma2`` carrier.
     # Delegate the lmgraph_from_ocpn + extract pipeline to its single home in from_ocpn.
-    return _signature_from_ocpn(ocpn, surface_termini=True)
+    return _signature_from_ocpn(ocpn, surface_termini=True, canonical=canonical)
 
 
 def signature_from_occn(ocel, *, bindings: bool = True) -> Signature:
@@ -131,7 +139,10 @@ def discover_model(ocel, cls: str):
         return occn, occn_to_signature(occn)
     if cls == "OCPN":
         ocpn = pm4py.discover_oc_petri_net(ocel)
-        return ocpn, _signature_from_ocpn(ocpn, surface_termini=True)
+        # canonical=False: discover_model's signature feeds behaviour-level
+        # consumers (splice/extract_classes need concrete ports, not the fast
+        # path's placeholder representatives).
+        return ocpn, _signature_from_ocpn(ocpn, surface_termini=True, canonical=False)
     return None, discover_signatures(ocel, object_centric=False).get(cls)
 
 

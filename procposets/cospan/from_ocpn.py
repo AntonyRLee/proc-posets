@@ -27,22 +27,28 @@ def lmgraph_from_ocpn(ocpn: dict) -> LMGraph:
     return lmgraph_from_petri_nets(nets)
 
 
-def signature_from_ocpn(ocpn: dict, *, canonical: bool = False,
+def signature_from_ocpn(ocpn: dict, *, canonical: bool = True,
                         surface_termini: bool = False,
                         remove_silent: bool = True) -> Signature:
     """OCPN dict -> generator signature ``Sigma`` (the ``lmgraph_from_ocpn`` +
     extractor pipeline in one call).
 
-    ``canonical=False`` (default) runs :func:`engine.extract_signature` -- the full
-    per-context signature carrying every firing context, needed for the
-    splice/behavioural semantics.  ``canonical=True`` runs the output-sensitive
+    ``canonical=True`` (default) runs the output-sensitive
     :func:`engine_fast.extract_signature_fast`: one representative generator per
     CanonKey, which stays tractable on *wide* object-centric nets where the full
     extractor's cross-type ``|B|x|F|`` product blows up (a hub shared across many
-    object types is exponential).  The two agree exactly on the CanonKey set (the
-    type-level / :func:`signature_compare.compare` view) -- so pass
-    ``canonical=True`` when you only need that view (comparison, inventory), and
-    keep the default for splice.
+    object types is exponential).  This is the right object for the type-level
+    views (:func:`signature_compare.compare`, inventory, localisation) -- the
+    dominant OCPN use -- and agrees exactly with the full extractor on the
+    CanonKey set, so the default cannot hang on a wide discovered net.
+
+    ``canonical=False`` runs :func:`engine.extract_signature` -- the full
+    per-context signature carrying every concrete firing context.  Required for
+    the splice/behavioural semantics (``extract_classes`` and friends consume
+    concrete ports; the canonical representatives carry synthetic placeholder
+    neighbours), and only tractable where ``|B|x|F|`` is.  For *composition*
+    behaviour prefer :func:`skeleton.extract_skeleton` +
+    :func:`compose.compose_signature`, which never materialise that product.
 
     OCPN callers typically want ``surface_termini=True`` (keep an object that
     terminates at a bare sink place as a ``gamma2`` right leg -- the object-centric
