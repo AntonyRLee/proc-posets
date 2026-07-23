@@ -72,53 +72,89 @@ def _side_profiles(g: LMGraph, a: str, *, forward: bool, surface_termini: bool) 
                 typs.add(typ)
             choices.append((rc, gc))
         (coupling if len(typs) > 1 else clean[next(iter(typs), None)]).append(choices)
-    # Per clean type: the achievable scalar (real, gamma2) counts over that type's arcs.
-    types_order: list = []
-    opts_lists: list = []
+    # Dedup in the OUTPUT space, not the raw (real, gamma2) split space.  The
+    # final profile keeps, per type, only the merged ``real + gamma2`` count --
+    # plus one side-level "has a real leg" bit deciding the pure-terminus
+    # collapse -- under ``surface_termini``, and only the real count under the
+    # default strip.  That reduction is additive per arc and OR-saturating on
+    # the bit, so applying it to each per-type option BEFORE the cross-arc /
+    # cross-type folds reaches exactly the reduced form of every raw state
+    # while the state count stays bounded by the output (x2 for the bit),
+    # never by the raw real-vs-gamma2 splits (which reach 2^19 on the
+    # Bundestag hub side where the output has ~2^15 profiles; measured
+    # 10.5s -> ~1s for the fold+product).  Totals fold arc-by-arc with dedup
+    # after every arc -- output-sensitive *within* a type too.
+    frag_lists: list = []
     for t, arcs in clean.items():
-        opts: set = set()
-        for combo in product(*arcs):
-            real = sum(sum(rc.values()) for rc, _ in combo)
-            g2 = sum(sum(gc.values()) for _, gc in combo)
-            opts.add((real, g2))
-        types_order.append(t)
-        opts_lists.append(sorted(opts))
-    # One product across the independent types (the prototype's fast path), then fold
-    # the rare coupling arcs incrementally.  state = (real_items, g2_items).
-    states: set = set()
-    for combo in product(*opts_lists):
-        rc = {}
-        gc = {}
-        for t, (real, g2) in zip(types_order, combo):
-            if real:
-                rc[t] = real
-            if g2:
-                gc[t] = g2
-        states.add((frozenset(rc.items()), frozenset(gc.items())))
-    for choices in coupling:
-        nxt: set = set()
-        for rprev, gprev in states:
-            for rc, gc in choices:
-                nr = dict(rprev)
-                for t, c in rc.items():
-                    nr[t] = nr.get(t, 0) + c
-                ng = dict(gprev)
-                for t, c in gc.items():
-                    ng[t] = ng.get(t, 0) + c
-                nxt.add((frozenset(nr.items()), frozenset(ng.items())))
-        states = nxt
-    out: set = set()
-    for rprev, gprev in states:
         if collapse:
-            if (rprev or gprev) and not rprev:      # all-gamma2 side -> pure terminus
+            opts: set = {(0, False)}
+            for arc_choices in arcs:
+                contribs = {(sum(rc.values()) + sum(gc.values()), bool(rc))
+                            for rc, gc in arc_choices}
+                opts = {(n + dn, hr or dhr) for (n, hr) in opts for (dn, dhr) in contribs}
+            frag_lists.append(sorted(((((t, n),) if n else ()), hr) for n, hr in opts))
+        else:
+            opts = {0}
+            for arc_choices in arcs:
+                contribs = {sum(rc.values()) for rc, _ in arc_choices}
+                opts = {n + dn for n in opts for dn in contribs}
+            frag_lists.append(sorted((((t, n),) if n else ()) for n in opts))
+    # One product across the independent types (the prototype's fast path), then
+    # fold the rare coupling arcs incrementally, both in the reduced space.
+    states: set = set()
+    if collapse:
+        for combo in product(*frag_lists):
+            items: tuple = ()
+            has_real = False
+            for fr, hr in combo:
+                items += fr
+                has_real = has_real or hr
+            states.add((frozenset(items), has_real))
+        for choices in coupling:
+            red = {
+                (tuple(sorted(_merge_counts(rc, gc).items())), bool(rc))
+                for rc, gc in choices
+            }
+            nxt: set = set()
+            for prev, has_real in states:
+                base = dict(prev)
+                for add, hr in red:
+                    nn = dict(base)
+                    for t, c in add:
+                        nn[t] = nn.get(t, 0) + c
+                    nxt.add((frozenset(nn.items()), has_real or hr))
+            states = nxt
+        out: set = set()
+        for prev, has_real in states:
+            if prev and not has_real:               # all-gamma2 side -> pure terminus
                 out.add(frozenset())
-                continue
-            merged = dict(rprev)
-            for t, c in gprev:
-                merged[t] = merged.get(t, 0) + c
-            out.add(frozenset(merged.items()))
-        else:                                       # strip: gamma2 legs absorbed
-            out.add(frozenset(rprev))
+            else:
+                out.add(prev)
+        return out
+    for combo in product(*frag_lists):
+        items = ()
+        for fr in combo:
+            items += fr
+        states.add(frozenset(items))
+    for choices in coupling:
+        red = {tuple(sorted(rc.items())) for rc, _ in choices}  # strip: gamma2 absorbed
+        nxt = set()
+        for prev in states:
+            base = dict(prev)
+            for add in red:
+                nn = dict(base)
+                for t, c in add:
+                    nn[t] = nn.get(t, 0) + c
+                nxt.add(frozenset(nn.items()))
+        states = nxt
+    return states
+
+
+def _merge_counts(rc: dict, gc: dict) -> dict:
+    """Per-type ``real + gamma2`` totals of one bundle (the surface-mode merge)."""
+    out = dict(rc)
+    for t, c in gc.items():
+        out[t] = out.get(t, 0) + c
     return out
 
 

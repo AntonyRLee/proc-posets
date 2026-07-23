@@ -99,6 +99,25 @@ def _optional_hub(k: int, m: int) -> LMGraph:
     return g
 
 
+def _coupled_terminus() -> LMGraph:
+    """A *coupling* out-arc (untyped XOR fanning into two object types) whose
+    alternatives include a bare-sink ``gamma2`` branch: ``X`` via untyped ``p``
+    reaches ``A`` (t1), ``B`` (t2), or a dead-end mediator (terminus).  This is
+    the one shape the clean per-type factoring cannot take -- the arc must be
+    folded jointly -- with the terminus modes live on the SAME arc."""
+    g = LMGraph()
+    for a in ("X", "A", "B"):
+        g.add_activity(a)
+    for m in ("p", "ma", "mb", "mdead"):
+        g.add_mediator(m, Kind.XOR)
+    g.add_edge("X", "p")            # untyped: the coupling source
+    g.add_edge("p", "ma"); g.add_edge("ma", "A", "t1")
+    g.add_edge("p", "mb"); g.add_edge("mb", "B", "t2")
+    g.add_edge("p", "mdead")        # bare dead end -> gamma2 terminus branch
+    g.validate()
+    return g
+
+
 def _canon_keys(sig) -> set:
     return set(canonical_generators(sig).keys())
 
@@ -161,6 +180,15 @@ def test_typed_hub_has_single_canonkey_for_hub():
     assert len(hub_keys) == 1
     fast_hub = {k for k in _canon_keys(extract_signature_fast(g)) if k.label == "H"}
     assert fast_hub == hub_keys
+
+
+def test_coupled_terminus_canonkeys_match():
+    _assert_same_canonkeys("coupled_terminus", _coupled_terminus, {})
+
+
+def test_coupled_terminus_surface_canonkeys_match():
+    _assert_same_canonkeys("coupled_terminus_surface", _coupled_terminus,
+                           {"surface_termini": True})
 
 
 def test_wide_optional_hub_stays_output_sensitive():

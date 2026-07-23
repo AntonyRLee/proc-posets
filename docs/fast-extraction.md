@@ -43,6 +43,16 @@ deduping on that state after every fold:
 - Terminus handling mirrors the slow engine exactly: default strip absorbs
   `gamma2` legs; `surface_termini` keeps them and collapses an all-`gamma2`
   side to zero-right (`engine._collapse_pure_terminus`).
+- The dedup space is the **output** space: per-type options are reduced to
+  what the final mapping keeps — merged `real+gamma2` count plus one
+  side-level saturating "has a real leg" bit under `surface_termini`, real
+  count only under strip — *before* the cross-arc/cross-type folds.  The raw
+  real-vs-gamma2 split space can be 16× larger than the profile space (2^19
+  vs ~2^15 on the Bundestag hub side); folding reduced is exact because the
+  reduction is additive per arc and OR-saturating on the bit.  Measured on the
+  full 44-type Bundestag OCPN: 15.4 s → 5.5 s end-to-end (1.8 s profiles +
+  1.1 s representative-generator build), i.e. parity with the CanonKey-only
+  prototype once generator materialisation is subtracted.
 
 **Contract:** byte-identical CanonKey set to `engine.extract_signature` on
 every graph the slow engine can reach.  Pinned by
