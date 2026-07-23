@@ -42,3 +42,19 @@ def test_high_cap_matches_the_uncapped_catalogue():
     high = extract_dp.extract_classes(sig, max_pomsets_per_state=10_000)
     assert high.truncated is False
     assert len(high.closing()) == _FULL_CLOSINGS
+
+
+def test_canonical_signature_fails_loudly_not_empty():
+    """A canonical (placeholder-port) signature fed to ``extract_classes``
+    would silently yield 0 closings -- indistinguishable from a dead model --
+    so it must raise instead (the guard behind ``signature_from_ocpn``'s
+    ``canonical=True`` default)."""
+    import pytest
+
+    from procposets.cospan.engine_fast import extract_signature_fast
+
+    from .test_cospan_engine_running_example import build_running_example as _bre
+
+    fast = extract_signature_fast(_bre())
+    with pytest.raises(ValueError, match="canonical placeholder"):
+        extract_dp.extract_classes(fast)

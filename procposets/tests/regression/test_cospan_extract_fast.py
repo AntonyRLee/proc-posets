@@ -203,6 +203,26 @@ def test_wide_optional_hub_stays_output_sensitive():
     assert len({k for k in fast if k.label == "H"}) == 2 ** 12
 
 
+def test_canonical_signature_cannot_reach_compose_silently():
+    """The flip's sharp edge, closed: a canonical signature's placeholder
+    neighbours can never connect, so composing one would return silently empty
+    -- ``compose_signature`` must fail loudly instead (pointing at
+    ``canonical=False`` / ``extract_skeleton``), and the predicate must not
+    misfire on real signatures."""
+    import pytest
+
+    from procposets.cospan.compose import compose_signature
+    from procposets.cospan.engine_fast import is_canonical_signature
+
+    fast = extract_signature_fast(build_running_example())
+    assert is_canonical_signature(fast)
+    with pytest.raises(ValueError, match="canonical placeholder"):
+        compose_signature(fast, start_label="G1", end_label="G2")
+    slow = extract_signature(build_running_example())
+    assert not is_canonical_signature(slow)
+    assert compose_signature(slow, start_label="G1", end_label="G2")
+
+
 def test_signature_from_ocpn_defaults_to_canonical():
     """The flip: ``signature_from_ocpn``'s default is the output-sensitive
     canonical extractor (cannot hang on a wide net), byte-equal to an explicit

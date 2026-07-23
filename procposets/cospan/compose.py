@@ -203,6 +203,20 @@ def compose_signature(
         provider = _FactoredReady(sigma)
         sources = _factored_sources(sigma, start_label)
     else:
+        # Canonical representatives (extract_signature_fast /
+        # signature_from_ocpn's default) carry placeholder neighbours that can
+        # never connect -- composing them would return silently empty. Fail
+        # loudly with the two real options instead.
+        from .engine_fast import is_canonical_signature
+
+        if is_canonical_signature(sigma):
+            raise ValueError(
+                "this Signature carries canonical placeholder neighbours "
+                "(extract_signature_fast / signature_from_ocpn's canonical=True "
+                "default) whose ports cannot compose -- re-extract with "
+                "canonical=False, or use skeleton.extract_skeleton for the "
+                "lazy factored composition"
+            )
         # `Signature.generators` is a frozenset; its iteration order depends on
         # Python's per-process hash-seed randomization. Sort once, by the same
         # stable key as `Signature.pretty()`/`vis.pick()`, so which composite is

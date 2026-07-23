@@ -32,6 +32,7 @@ Returns one representative :class:`Generator` per CanonKey (no bindings) -- for
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from itertools import product
 
@@ -39,6 +40,24 @@ from .engine import GAMMA2, _prepare_extraction, _traverse
 from .lmgraph import LMGraph
 from .signature import Generator, Port, Signature
 from .signature_compare import CanonKey
+
+# the synthetic neighbour-label form _gen_from_profile mints (``·i:type``)
+_PLACEHOLDER = re.compile(r"^·\d+:")
+
+
+def is_canonical_signature(sig: Signature) -> bool:
+    """True iff ``sig`` carries canonical representatives' synthetic placeholder
+    neighbours (``·i:type``) -- i.e. it came from :func:`extract_signature_fast`
+    (or ``signature_from_ocpn``'s ``canonical=True`` default).
+
+    Such ports can never connect (a producer's right ``(lab, t, ·i:t)`` never
+    equals a consumer's left ``(·j:t, t, lab)``), so behaviour-level machinery
+    fed one would return silently-empty results -- ``compose_signature`` and
+    ``extract_classes`` call this to fail loudly instead."""
+    return any(
+        _PLACEHOLDER.match(p.src) or _PLACEHOLDER.match(p.tgt)
+        for g in sig for p in (*g.left, *g.right)
+    )
 
 
 def _side_profiles(g: LMGraph, a: str, *, forward: bool, surface_termini: bool) -> set:
