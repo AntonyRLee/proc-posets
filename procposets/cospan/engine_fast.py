@@ -2,37 +2,34 @@
 generator per distinct CanonKey) as :func:`engine.extract_signature`, without
 materialising the cross-type ``|B|x|F|`` product that makes the slow engine
 intractable on wide object-centric nets (a hub shared across ``k`` object types
-blows up exponentially in ``k``).  See
-``docs/2026-07-20-fast-signature-extraction.md`` for the derivation.
+blows up exponentially in ``k``).  See ``docs/fast-extraction.md`` for the
+derivation and the wider factored-skeleton architecture this is part of.
 
-**Exactness contract.**  For every activity whose *per-coupled-component* arc
-product stays under :data:`_ENUM_CAP` -- i.e. every case the slow engine can
-itself reach -- the CanonKey set is **byte-identical** to
-:func:`engine.extract_signature` (verified by
-``tests/regression/test_cpm_extract_fast.py``).  The speed comes from two moves
-the slow engine does not make:
+**Exactness contract.**  The CanonKey set is **byte-identical** to
+:func:`engine.extract_signature` on every fixture the slow engine can reach
+(verified by ``tests/regression/test_cospan_extract_fast.py``).  The speed comes
+from working at the *canon-profile* level, never at the concrete-bundle level.
 
-1. *Coupled-component decomposition.*  Arcs that can reach a common object type
-   are enumerated together; type-disjoint components factor (their endpoint sets
-   are disjoint), so achievable side-bundles are the Cartesian product across
-   components.  This is where the cross-type blow-up dies: the slow engine
-   AND-products *all* arcs of *all* types at once.
-2. *Collapse to the CanonKey-relevant key.*  A CanonKey only reads the per-type
-   endpoint *count* (and, once termini are surfaced, whether a leg is a
-   ``gamma2`` terminus), never *which* endpoint.  So each component keeps one
-   representative bundle per distinct ``(is_gamma2, type)``-multiset -- a handful,
-   not the ``10^k`` raw bundles.
+A CanonKey reads only, per boundary side, the **multiset of endpoint object
+types** (a surfaced terminus contributing its merged per-type count once the
+pure-terminus collapse has been decided) -- never *which* concrete
+predecessor/successor.  So we combine an activity's arcs one at a time in the
+**output space**: the partial state carries, per type, only the merged
+``real + gamma2`` leg count, plus one side-level saturating "has a real leg"
+bit (which decides the pure-terminus collapse) under ``surface_termini`` --
+real counts only under the default strip -- deduping after every fold step.
+Two partial states equal in that reduced form have identical futures, so the
+state set stays bounded by the number of distinct **profiles**, i.e. by the
+output, never by the ``product-over-arcs`` of concrete endpoint choices (nor
+by the raw real-vs-``gamma2`` split space, which can run 16x larger than the
+profile space).  The Bundestag hub ``Beratung`` (26 typed arcs, ~15
+independently optional) yields its 32,768 profiles in under two seconds where
+the concrete-bundle product blew up / hung for minutes.
 
-Post-processing (terminus strip / pure-terminus collapse) reuses the slow
-engine's own :func:`engine._strip_termini` / :func:`engine._collapse_pure_terminus`
-on the representatives, so it is identical by construction.
-
-**Above the cap** (same-type high fan-out -- variable/double arcs -- which the
-slow engine also cannot finish): a *single-type* component falls back to the
-exact ``[min-hitting, max-matching]`` arity interval; a *multi-type* component
-over the cap can only arise from an untyped choice node fanning into a large
-coupled type-web (never produced by a discovered OCPN), so it raises rather than
-risk a silently-wrong answer.
+The terminus handling is folded into the state summary so it matches
+``engine._strip_termini`` (default: ``gamma2`` legs absorbed) and
+``engine._collapse_pure_terminus`` (``surface_termini``: ``gamma2`` legs kept and
+counted by type, an all-``gamma2`` side collapsing to the empty right) exactly.
 
 Returns one representative :class:`Generator` per CanonKey (no bindings) -- for
 ``compare`` / type-level views.  For the full per-context generator set
@@ -40,147 +37,165 @@ Returns one representative :class:`Generator` per CanonKey (no bindings) -- for
 """
 from __future__ import annotations
 
-from itertools import combinations, product
+import re
+from collections import defaultdict
+from itertools import product
 
-from .._unionfind import UnionFind
-from .engine import (
-    GAMMA2,
-    _collapse_pure_terminus,
-    _gen_from_bundles,
-    _prepare_extraction,
-    _strip_termini,
-    _traverse,
-)
+from .engine import GAMMA2, _prepare_extraction, _traverse
 from .lmgraph import LMGraph
-from .signature import Signature
-from .signature_compare import canon_key
+from .signature import Generator, Port, Signature
+from .signature_compare import CanonKey
 
-_ENUM_CAP = 200_000  # per-coupled-component arc product budget
+# the synthetic neighbour-label form _gen_from_profile mints (``·i:type``)
+_PLACEHOLDER = re.compile(r"^·\d+:")
 
 
-def _arc_bundlesets(g: LMGraph, a: str, forward: bool) -> list:
-    """Per arc of one side of ``a``: the arc's reachable bundle-set as a list of
-    ``(label, type)`` frozensets -- exactly the slow engine's per-arc ``_traverse``."""
+def is_canonical_signature(sig: Signature) -> bool:
+    """True iff ``sig`` carries canonical representatives' synthetic placeholder
+    neighbours (``·i:type``) -- i.e. it came from :func:`extract_signature_fast`
+    (or ``signature_from_ocpn``'s ``canonical=True`` default).
+
+    Such ports can never connect (a producer's right ``(lab, t, ·i:t)`` never
+    equals a consumer's left ``(·j:t, t, lab)``), so behaviour-level machinery
+    fed one would return silently-empty results -- ``compose_signature`` and
+    ``extract_classes`` call this to fail loudly instead."""
+    return any(
+        _PLACEHOLDER.match(p.src) or _PLACEHOLDER.match(p.tgt)
+        for g in sig for p in (*g.left, *g.right)
+    )
+
+
+def _side_profiles(g: LMGraph, a: str, *, forward: bool, surface_termini: bool) -> set:
+    """Achievable set of canon *profiles* for one boundary side of ``a`` -- each a
+    ``frozenset`` of ``(object_type, arity)`` legs (``frozenset()`` = the empty side).
+
+    Combines the side's arcs incrementally in the reduced output space (per-type
+    merged counts + the side-level has-a-real-leg bit under ``surface_termini``,
+    real counts only under strip -- see the module docstring), deduping after
+    every fold, so the state set is bounded by the number of distinct profiles
+    (the output), not the concrete ``product-over-arcs``.  Endpoint
+    types are the *resolved* types :func:`engine._traverse` returns (which need not
+    equal an arc's declared ``e.typ`` -- e.g. an untyped choice fanning into several
+    typed successors), so this is exact for arbitrary LM-graphs, not only clean OCPNs."""
     edges = g.out_edges(a) if forward else g.in_edges(a)
-    out = []
+    collapse = forward and surface_termini
+    # Split arcs: a *clean* arc reaches a single object type across all its bundle
+    # choices (the OCPN norm -- one typed net per type), so it factors into that
+    # type's independent contribution; a *coupling* arc's bundles span >1 type (only
+    # an untyped choice node produces this) and must be folded jointly.
+    clean: dict = defaultdict(list)
+    coupling: list = []
     for e in edges:
         node = e.tgt if forward else e.src
-        Se = _traverse(g, node, (e.typ,), frozenset(), forward=forward)
-        out.append([frozenset(b) for b in Se])
+        choices: list = []
+        typs: set = set()
+        for b in _traverse(g, node, (e.typ,), frozenset(), forward=forward):
+            rc: dict = {}
+            gc: dict = {}
+            for lab_, typ in b:
+                d = gc if lab_ == GAMMA2 else rc
+                d[typ] = d.get(typ, 0) + 1
+                typs.add(typ)
+            choices.append((rc, gc))
+        (coupling if len(typs) > 1 else clean[next(iter(typs), None)]).append(choices)
+    # Dedup in the OUTPUT space, not the raw (real, gamma2) split space.  The
+    # final profile keeps, per type, only the merged ``real + gamma2`` count --
+    # plus one side-level "has a real leg" bit deciding the pure-terminus
+    # collapse -- under ``surface_termini``, and only the real count under the
+    # default strip.  That reduction is additive per arc and OR-saturating on
+    # the bit, so applying it to each per-type option BEFORE the cross-arc /
+    # cross-type folds reaches exactly the reduced form of every raw state
+    # while the state count stays bounded by the output (x2 for the bit),
+    # never by the raw real-vs-gamma2 splits (which reach 2^19 on the
+    # Bundestag hub side where the output has ~2^15 profiles; measured
+    # 10.5s -> ~1s for the fold+product).  Totals fold arc-by-arc with dedup
+    # after every arc -- output-sensitive *within* a type too.
+    frag_lists: list = []
+    for t, arcs in clean.items():
+        if collapse:
+            opts: set = {(0, False)}
+            for arc_choices in arcs:
+                contribs = {(sum(rc.values()) + sum(gc.values()), bool(rc))
+                            for rc, gc in arc_choices}
+                opts = {(n + dn, hr or dhr) for (n, hr) in opts for (dn, dhr) in contribs}
+            frag_lists.append(sorted(((((t, n),) if n else ()), hr) for n, hr in opts))
+        else:
+            opts = {0}
+            for arc_choices in arcs:
+                contribs = {sum(rc.values()) for rc, _ in arc_choices}
+                opts = {n + dn for n in opts for dn in contribs}
+            frag_lists.append(sorted((((t, n),) if n else ()) for n in opts))
+    # One product across the independent types (the prototype's fast path), then
+    # fold the rare coupling arcs incrementally, both in the reduced space.
+    states: set = set()
+    if collapse:
+        for combo in product(*frag_lists):
+            items: tuple = ()
+            has_real = False
+            for fr, hr in combo:
+                items += fr
+                has_real = has_real or hr
+            states.add((frozenset(items), has_real))
+        for choices in coupling:
+            red = {
+                (tuple(sorted(_merge_counts(rc, gc).items())), bool(rc))
+                for rc, gc in choices
+            }
+            nxt: set = set()
+            for prev, has_real in states:
+                base = dict(prev)
+                for add, hr in red:
+                    nn = dict(base)
+                    for t, c in add:
+                        nn[t] = nn.get(t, 0) + c
+                    nxt.add((frozenset(nn.items()), has_real or hr))
+            states = nxt
+        out: set = set()
+        for prev, has_real in states:
+            if prev and not has_real:               # all-gamma2 side -> pure terminus
+                out.add(frozenset())
+            else:
+                out.add(prev)
+        return out
+    for combo in product(*frag_lists):
+        items = ()
+        for fr in combo:
+            items += fr
+        states.add(frozenset(items))
+    for choices in coupling:
+        red = {tuple(sorted(rc.items())) for rc, _ in choices}  # strip: gamma2 absorbed
+        nxt = set()
+        for prev in states:
+            base = dict(prev)
+            for add in red:
+                nn = dict(base)
+                for t, c in add:
+                    nn[t] = nn.get(t, 0) + c
+                nxt.add(frozenset(nn.items()))
+        states = nxt
+    return states
+
+
+def _merge_counts(rc: dict, gc: dict) -> dict:
+    """Per-type ``real + gamma2`` totals of one bundle (the surface-mode merge)."""
+    out = dict(rc)
+    for t, c in gc.items():
+        out[t] = out.get(t, 0) + c
     return out
 
 
-def _reachable_types(opts: list) -> set:
-    """The object types an arc can contribute across all its bundle options."""
-    return {t for b in opts for (_lab, t) in b}
-
-
-def _components(arc_opts: list) -> list:
-    """Partition arcs into connected components under *shared reachable type*.
-
-    Two arcs that can reach a common object type are coupled: their per-type
-    endpoint counts interact (dedup of a shared endpoint, or a joint choice
-    forced through an untyped node), so they must be enumerated together.
-    Type-disjoint components factor -- their endpoint sets are disjoint, so the
-    achievable full-side bundles are the Cartesian product of the components'.
-    Over-coupling only ever costs enumeration, never correctness; *under*-coupling
-    loses distinct CanonKeys (the untyped-choice bug this file fixes)."""
-    uf = UnionFind(range(len(arc_opts)))
-    by_type: dict = {}
-    for i, opts in enumerate(arc_opts):
-        for t in _reachable_types(opts):
-            if t in by_type:
-                uf.union(i, by_type[t])
-            else:
-                by_type[t] = i
-    return [[arc_opts[i] for i in idxs] for idxs in uf.groups()]
-
-
-def _max_matching(reach: list) -> int:
-    match: dict = {}
-
-    def aug(i, seen):
-        for ep in reach[i]:
-            if ep in seen:
-                continue
-            seen.add(ep)
-            if ep not in match or aug(match[ep], seen):
-                match[ep] = i
-                return True
-        return False
-
-    size = 0
-    for i in range(len(reach)):
-        if reach[i] and aug(i, set()):
-            size += 1
-    return size
-
-
-def _min_hitting(must: list) -> int:
-    if not must:
-        return 0
-    universe = sorted(set().union(*must), key=str)
-    for s in range(1, len(must) + 1):
-        for cand in combinations(universe, s):
-            cs = set(cand)
-            if all(cs & r for r in must):
-                return s
-    return len(must)
-
-
-def _endpoint_key(bundle: frozenset) -> tuple:
-    """The finest thing strip / collapse / :func:`canon_key` can distinguish about a
-    bundle: the multiset of ``(is_gamma2, type)`` over its endpoints.  Two bundles
-    with the same key yield identical post-processing and identical CanonKeys."""
-    return tuple(sorted(
-        ((ep[0] == GAMMA2, ep[1]) for ep in bundle),
-        key=lambda x: (x[0], str(x[1])),
-    ))
-
-
-def _component_bundles(comp: list) -> set:
-    """Achievable union-bundles within one coupled component, one representative
-    per distinct :func:`_endpoint_key`.  Enumerate the arc product when it is under
-    the cap; above it a single-type component uses the exact
-    ``[min-hitting, max-matching]`` arity interval, and a multi-type component is
-    unsupported (raises -- it cannot come from a discovered OCPN)."""
-    total = 1
-    for o in comp:
-        total *= max(1, len(o))
-    if total <= _ENUM_CAP:
-        seen: dict = {}
-        for combo in product(*comp):
-            u = frozenset().union(*combo) if combo else frozenset()
-            seen.setdefault(_endpoint_key(u), u)
-        return set(seen.values())
-    types = set().union(*(_reachable_types(o) for o in comp))
-    if len(types) > 1:
-        raise NotImplementedError(
-            "multi-type coupled component exceeds the enumeration cap: an untyped "
-            "choice node fans into a large coupled type-web. Discovered OCPNs do "
-            "not produce this shape; use engine.extract_signature for it."
-        )
-    reach = [{ep for b in opts for ep in b} for opts in comp]
-    must = [r for opts, r in zip(comp, reach) if frozenset() not in opts and r]
-    lo, hi = _min_hitting(must), _max_matching(reach)
-    universe = sorted(set().union(*reach), key=str) if reach else []
-    g2eps = [e for e in universe if e[0] == GAMMA2]
-    reps = set()
-    for ar in range(max(lo, 0), hi + 1):
-        reps.add(frozenset(g2eps[:ar]) if len(g2eps) >= ar else frozenset(universe[:ar]))
-    return reps or {frozenset()}
-
-
-def _side_bundles(g: LMGraph, a: str, forward: bool) -> set:
-    """Achievable full-side bundle-set (pre strip/collapse) for one side of ``a``:
-    the Cartesian product over type-disjoint components of each component's
-    collapsed representative bundles -- output-sensitive, and equal set-for-set to
-    the slow engine's ``_and`` on every below-cap component."""
-    reps = {frozenset()}
-    for comp in _components(_arc_bundlesets(g, a, forward)):
-        comp_bundles = _component_bundles(comp)
-        reps = {r | c for r in reps for c in comp_bundles}
-    return reps
+def _gen_from_profile(lab: str, left_profile: frozenset, right_profile: frozenset) -> Generator:
+    """A representative :class:`Generator` realising the given canon profiles: one
+    distinct :class:`Port` per typed leg (the concrete neighbour label is a synthetic
+    placeholder -- the fast signature carries no bindings, and a CanonKey reads only
+    the per-type leg count)."""
+    left = frozenset(
+        Port(f"·{i}:{t}", t, lab) for (t, ar) in left_profile for i in range(ar)
+    )
+    right = frozenset(
+        Port(lab, t, f"·{i}:{t}") for (t, ar) in right_profile for i in range(ar)
+    )
+    return Generator(lab, left, right)
 
 
 def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
@@ -189,22 +204,21 @@ def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
     :class:`Generator` per distinct CanonKey, without the cross-type ``|B|x|F|``
     blow-up.  See the module docstring for the exactness contract."""
     g, surface_termini = _prepare_extraction(g, remove_silent, surface_termini)
+
+    def _side_key(profile: frozenset) -> tuple:
+        # exactly signature_compare._type_multiset's canonical ((type, count), ...) form
+        return tuple(sorted(profile, key=lambda kv: (str(kv[0]), kv[1])))
+
     best: dict = {}
-
-    def _bkey(bundle):  # deterministic order over a set of (label, type) bundles
-        return tuple(sorted((str(x), str(y)) for (x, y) in bundle))
-
-    # Iterate in a stable order so the representative Generator kept per CanonKey
-    # (best.setdefault keeps the first) is deterministic across runs; the CanonKey
-    # SET is order-invariant, so this changes which Generator object represents a
-    # key, never the set of keys the golden cross-check pins.
     for a in sorted(g.activities):
         lab = g.lab(a)
-        B = _side_bundles(g, a, forward=False)  # backward carries no gamma2 -> no post-proc
-        F = _side_bundles(g, a, forward=True)
-        F = _collapse_pure_terminus(F) if surface_termini else _strip_termini(F)
-        for P in sorted(B, key=_bkey):
-            for S in sorted(F, key=_bkey):
-                gen = _gen_from_bundles(lab, P, S)
-                best.setdefault(canon_key(gen), gen)
+        in_profiles = _side_profiles(g, a, forward=False, surface_termini=surface_termini)
+        out_profiles = _side_profiles(g, a, forward=True, surface_termini=surface_termini)
+        out_keyed = [(_side_key(ov), ov) for ov in out_profiles]
+        for iv in in_profiles:
+            ik = _side_key(iv)
+            for ok, ov in out_keyed:
+                key = CanonKey(lab, ik, ok)
+                if key not in best:               # build the representative Generator once per key
+                    best[key] = _gen_from_profile(lab, iv, ov)
     return Signature(frozenset(best.values()))

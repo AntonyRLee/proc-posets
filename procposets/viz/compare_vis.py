@@ -14,7 +14,7 @@ from __future__ import annotations
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
-from ..cospan.signature_compare import ComparisonReport  # noqa: E402
+from ..cospan.signature_compare import ComparisonReport, MarginalKey  # noqa: E402
 
 # status -> (fill, edge) colours
 _STATUS_COLOUR = {
@@ -27,12 +27,31 @@ _STATUS_COLOUR = {
 _VERDICT_COLOUR = {"match": "#5a9e4e", "param-diff": "#d8881a", "partial": "#7a7a7a"}
 
 
-def comparison_matrix(report: ComparisonReport, path: str | None = None, *, title: str | None = None):
+def comparison_matrix(report: ComparisonReport, path: str | None = None, *,
+                      title: str | None = None, max_rows: int = 1000):
     """Draw the comparison matrix; save to ``path`` (``.svg``/``.png``) if given and
-    return the Figure."""
+    return the Figure.
+
+    Figure height grows linearly with rows (0.66 units each), so the matrix is
+    only viable for reports up to ~10^3 rows -- beyond ``max_rows`` we raise
+    instead of producing a multi-hundred-MB SVG or exceeding matplotlib's
+    2^16-pixel Agg limit (a wide-OCPN *joint* report can carry tens of
+    thousands of CanonKey rows; the 44-type Bundestag's has 35,009).  For those,
+    compare with ``key="marginal"`` (a per-(activity, side, type) fact per row,
+    ~k facts per side on a k-type hub) or pre-filter the rows."""
     cols = list(report.notations)
     rows = list(report.rows)
     n_cols = len(cols)
+    if len(rows) > max_rows:
+        raise ValueError(
+            f"comparison_matrix: {len(rows)} rows exceeds max_rows={max_rows} -- "
+            "a figure this tall is unusable (and breaks matplotlib's 2^16-px "
+            "limit). Use compare(..., key='marginal') for the factored view, "
+            "or filter the report's rows."
+        )
+    # a marginal (per-(activity, side, type) ArityFact) report needs its own
+    # chrome: the joint captions would mislabel arity SETS as §32 binding ranges
+    marginal = any(isinstance(r.key, MarginalKey) for r in rows)
 
     # cell texts up front, so column/label widths can be sized to the content (no overlap)
     cell_txt = {(i, n): ("—" if cell.profile is None else cell.profile.render())
@@ -60,8 +79,10 @@ def comparison_matrix(report: ComparisonReport, path: str | None = None, *, titl
         return 7.6 if len(txt) <= 18 else (6.6 if len(txt) <= 28 else 5.8)
 
     # header row
-    ax.text(0.12, head_h / 2, "generator", ha="left", va="center", fontsize=9, fontweight="bold")
-    ax.text(lbl_indent, head_h / 2, "(in → out)", ha="left", va="center", fontsize=8, color="#555")
+    ax.text(0.12, head_h / 2, "generator" if not marginal else "marginal fact",
+            ha="left", va="center", fontsize=9, fontweight="bold")
+    ax.text(lbl_indent, head_h / 2, "(in → out)" if not marginal else "(side/type)",
+            ha="left", va="center", fontsize=8, color="#555")
     for j, n in enumerate(cols):
         x = lbl_w + j * cell_w
         is_ref = n == report.reference
@@ -120,11 +141,14 @@ def comparison_matrix(report: ComparisonReport, path: str | None = None, *, titl
     ax.text(0.12, y + 0.2, f"vs reference {report.reference} —   {detail}",
             ha="left", va="center", fontsize=8, color="#333", fontweight="bold")
     ax.text(0.12, y + 0.2 + cell_h,
-            "↓ input leg, ↑ output leg; ranges are objects-per-firing (§32); "
-            "boundary generators encode start/end per-adapter",
+            ("↓ input leg, ↑ output leg; ranges are objects-per-firing (§32); "
+             "boundary generators encode start/end per-adapter") if not marginal else
+            ("↓ input side, ↑ output side; cells are achievable per-type leg counts "
+             "(0 = the type is optional); boundary generators encode start/end per-adapter"),
             ha="left", va="center", fontsize=7.2, color="#777")
 
-    ax.set_title(title or f"signature comparison — {n_cols} notations, {len(rows)} canonical generators",
+    unit = "canonical generators" if not marginal else "marginal facts"
+    ax.set_title(title or f"signature comparison — {n_cols} notations, {len(rows)} {unit}",
                  fontsize=11, fontweight="bold")
     fig.tight_layout()
     if path is not None:

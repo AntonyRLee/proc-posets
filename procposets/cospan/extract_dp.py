@@ -238,6 +238,18 @@ def extract_classes(
     over-generates" signal. Loops are extracted in full regardless (they are
     the factored generating structure used for comparison)."""
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 100_000))
+    # Canonical representatives (extract_signature_fast / signature_from_ocpn's
+    # default) carry placeholder neighbours that can never connect -- the search
+    # would return silently empty (0 closings). Fail loudly instead.
+    from .engine_fast import is_canonical_signature
+
+    if is_canonical_signature(sig):
+        raise ValueError(
+            "this Signature carries canonical placeholder neighbours "
+            "(extract_signature_fast / signature_from_ocpn's canonical=True "
+            "default) whose ports cannot connect -- re-extract with "
+            "canonical=False for the splice/behavioural machinery"
+        )
     # a terminating object (the discovered OCPN's ``s`` carrier -> bare final place, surfaced
     # as a ``(…, gamma2)`` right leg by ``engine._traverse``) drains only through a consuming
     # generator; a bare sink has none, so without this the frontier never empties (0

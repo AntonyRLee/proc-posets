@@ -3,10 +3,11 @@
 Modules are imported by full path (matching the source repo's usage), so
 ``import procposets.cospan`` pulls nothing heavy.  Two sub-layers live here:
 
-- **B0 (pure stdlib):** signature, lmgraph, engine, engine_fast, typebalance,
-  constraints, feasibility, compose, class_extraction, morphism_schema,
-  signature_compare, signature_diff, discovery_cleanup, from_petri, from_ocpn,
-  unroll_core.  Usable with the numpy-only core, no extra.
+- **B0 (pure stdlib):** signature, lmgraph, engine, engine_fast, skeleton,
+  typebalance, constraints, feasibility, compose, class_extraction,
+  morphism_schema, signature_compare, signature_diff, discovery_cleanup,
+  from_petri, from_ocpn, unroll_core.  Usable with the numpy-only core, no
+  extra.
 - **B1 (needs the [graph] extra -- networkx):** occurrence, extract_dp,
   dag_diff, splice, trace_language, from_heuristics, equivalence.
   (class_extraction pulls extract_dp lazily, so it stays B0 until its extraction
