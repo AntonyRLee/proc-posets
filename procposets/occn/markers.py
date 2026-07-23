@@ -53,6 +53,27 @@ class OCCN:
     input_groups: dict[str, list[tuple[MarkerGroup, int]]]
     output_groups: dict[str, list[tuple[MarkerGroup, int]]]
 
+    def filtered(self, *, min_count: int = 0, min_rel: float = 0.0) -> "OCCN":
+        """Opt-in binding filter: drop marker groups observed fewer than
+        ``min_count`` times or in less than ``min_rel`` of the owning
+        activity-side's total observations. Mined binding lists are heavily
+        skewed on real logs (rare co-firing structures inflate the signature);
+        this prunes them WITHOUT touching the dependency graph. The most
+        frequent group per (activity, side) is always kept -- filtering must
+        thin alternatives, never erase an activity's whole behaviour."""
+        def keep(groups: list[tuple[MarkerGroup, int]]) -> list[tuple[MarkerGroup, int]]:
+            if not groups:
+                return groups
+            total = sum(c for _, c in groups)
+            kept = [(g, c) for g, c in groups
+                    if c >= min_count and (total == 0 or c / total >= min_rel)]
+            return kept or [max(groups, key=lambda gc: gc[1])]
+        return OCCN(
+            self.ocdg,
+            {t: keep(gs) for t, gs in self.input_groups.items()},
+            {t: keep(gs) for t, gs in self.output_groups.items()},
+        )
+
 
 # ---------------------------------------------------------------------------
 # OCEL indexing

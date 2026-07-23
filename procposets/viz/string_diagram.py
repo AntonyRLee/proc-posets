@@ -369,8 +369,27 @@ def render(
         legend_types |= {p.typ for p in signature.ports()}
     cmap = _colour_map(legend_types)
 
+    # default labelled view: number every boundary port once and list the
+    # number -> (src, type, tgt) lookup in a legend under the diagram -- full
+    # triples on the wires collide with each other and the type legend.  An
+    # explicit ``wire_labels`` (e.g. from catalogue()) takes precedence.
+    numbered_ports: list[Port] | None = None
+    if labels and wire_labels is None:
+        numbered_ports = sorted(
+            {w.port for w in layout.wires if w.boundary and w.port is not None},
+            key=lambda p: (str(p.typ), p.src, p.tgt),
+        )
+        wire_labels = {p: str(k) for k, p in enumerate(numbered_ports)}
+
     if ax is None:
-        fig, ax = plt.subplots(figsize=(max(4, 1.6 * (len(layout.boxes) + 1)), 4))
+        # size from the layout's extents: a ⊗-stack of many generators grows
+        # tall, a ;-chain grows wide -- the old fixed 4-inch height squashed
+        # the former into unreadability.
+        bxs = [b.x for b in layout.boxes] or [0.0]
+        bys = [y for b in layout.boxes for y in (b.y - b.half_h, b.y + b.half_h)] or [0.0]
+        w_in = max(4.0, 1.6 * (max(bxs) - min(bxs)) + 4.0)
+        h_in = max(4.0, 0.85 * (max(bys) - min(bys)) + 2.0)
+        fig, ax = plt.subplots(figsize=(w_in, h_in))
         owns_fig = True
     else:
         fig = ax.figure
@@ -487,6 +506,23 @@ def render(
         title_fontsize=8,
         frameon=False,
     )
+
+    if owns_fig and numbered_ports:
+        # number -> triple lookup under the diagram; offsets in points so the
+        # line spacing is size-independent (bbox_inches="tight" picks it up).
+        ncols = 1 if len(numbered_ports) <= 12 else 2
+        nrows = -(-len(numbered_ports) // ncols)
+        ax.annotate("ports  (number: src — type — tgt):", xy=(0, 0),
+                    xycoords="axes fraction", xytext=(4, -12), textcoords="offset points",
+                    fontsize=9, fontweight="bold", ha="left", va="top",
+                    annotation_clip=False)
+        for k, p in enumerate(numbered_ports):
+            c, r = divmod(k, nrows)
+            ax.annotate(f"{k}:  {p.src} — {p.typ} — {p.tgt}", xy=(0, 0),
+                        xycoords="axes fraction",
+                        xytext=(4 + c * 300, -26 - r * 12), textcoords="offset points",
+                        fontsize=8.5, fontweight="bold", color=_darken(cmap[p.typ]),
+                        ha="left", va="top", annotation_clip=False)
 
     ax.set_aspect("equal")
     ax.autoscale_view()
