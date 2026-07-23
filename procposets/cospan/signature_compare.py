@@ -85,6 +85,77 @@ def canon_key(g: Generator) -> CanonKey:
 
 
 @dataclass(frozen=True)
+class MarginalKey:
+    """Notation-independent identity of one **marginal fact**: activity label +
+    boundary side + object type -- one ``(activity, side, type)`` axis of the
+    joint :class:`CanonKey`.  Deliberately NOT ``order=True``: ``typ`` mixes
+    ``None`` and ``str``, so rows are sorted by an explicit ``str`` key."""
+
+    label: str
+    side: str          # "in" | "out"
+    typ: str | None
+
+    @property
+    def boundary(self) -> bool:
+        return is_gamma_or_marker(self.label)
+
+    def arity_str(self) -> str:
+        return f"{'↓' if self.side == 'in' else '↑'}{self.typ}"
+
+
+@dataclass(frozen=True)
+class ArityFact:
+    """The achievable leg arities of one ``(activity, side, type)`` axis --
+    including ``0`` when some context omits the type (optionality is part of
+    the fact).  This is the marginal of the joint CanonKey set along one type;
+    the joint set is a subset of the product of its marginals, with equality
+    exactly when the types factor independently (discovered OCPNs: per-type
+    nets, type-preserving mediators)."""
+
+    arities: tuple  # sorted, distinct ints
+
+    def render(self) -> str:
+        return "{" + ",".join(map(str, self.arities)) + "}"
+
+
+def marginal_facts(sig: Signature) -> dict[MarginalKey, ArityFact]:
+    """Decompose ``sig``'s joint CanonKey set into per-``(activity, side,
+    type)`` marginal facts.
+
+    A wide object-centric hub achieving ``2^k`` side profiles (k independently
+    optional types) collapses to ``~k`` facts per side, and a single per-type
+    arity change surfaces as ONE differing fact instead of thousands of
+    differing joint keys.  The price: cross-type XOR coupling is erased (the
+    running example's mode-refined ``s`` routes con XOR box; the marginals
+    ``con {0,1}, box {0,1}`` also admit the never-realised con+box and neither
+    context) -- lossy in general, lossless exactly when types factor.  This is
+    why :func:`compare` keeps the joint key as its default and the marginal
+    view is opt-in."""
+    per_side: dict[tuple[str, str], list[dict]] = {}
+    for ck in canonical_generators(sig):
+        per_side.setdefault((ck.label, "in"), []).append(dict(ck.left))
+        per_side.setdefault((ck.label, "out"), []).append(dict(ck.right))
+    out: dict[MarginalKey, ArityFact] = {}
+    for (label, side), multisets in per_side.items():
+        domain = set().union(*multisets)  # every type this side ever carries
+        if not domain:
+            # an ALWAYS-empty side has no typed axis to decompose along, but its
+            # emptiness is itself the fact: without this row a legless generator
+            # (zero-left origin whose terminus is absorbed -- e.g. a per-type
+            # source->a->sink net) would vanish from the marginal view entirely,
+            # and whole-generator existence must stay comparable.  Recorded
+            # under ``typ=None`` with arities ``(0,)`` -- collision-free by
+            # construction, since an untyped-leg (None) fact can only arise
+            # when the side is sometimes nonempty.
+            out[MarginalKey(label, side, None)] = ArityFact((0,))
+            continue
+        for t in domain:
+            arities = sorted({ms.get(t, 0) for ms in multisets})
+            out[MarginalKey(label, side, t)] = ArityFact(tuple(arities))
+    return out
+
+
+@dataclass(frozen=True)
 class BindingProfile:
     """The §32 N-linear parameters of a generator, keyed by ``(side, type)`` so it is
     comparable across notations.
@@ -191,9 +262,12 @@ class Cell:
 
     ``status``: ``ref`` (the reference column), ``match`` (== reference),
     ``diff`` (present but binding-params differ from reference), ``absent`` (the
-    notation lacks this generator), ``novel`` (present, but absent in the reference)."""
+    notation lacks this generator), ``novel`` (present, but absent in the reference).
 
-    profile: BindingProfile | None
+    ``profile`` is a :class:`BindingProfile` in the joint view, an
+    :class:`ArityFact` in the marginal view (both render via ``.render()``)."""
+
+    profile: BindingProfile | ArityFact | None
     status: str
 
 
@@ -248,19 +322,9 @@ class ComparisonReport:
         return out
 
 
-def compare(named_sigs: dict[str, Signature], *, reference: str | None = None) -> ComparisonReport:
-    """Align the generators of several notations' signatures by :class:`CanonKey` and
-    classify each against ``reference`` (default: ``"master"`` if present, else the
-    first notation). Columns are ordered reference-first; rows are interior
-    generators (sorted by label/arity) then boundary generators."""
-    notations = list(named_sigs)
-    if reference is None:
-        reference = "master" if "master" in named_sigs else notations[0]
-    if reference not in named_sigs:
-        raise ValueError(f"reference {reference!r} not among {notations}")
-    order = [reference] + [n for n in notations if n != reference]
-
-    per_notation = {n: canonical_generators(s) for n, s in named_sigs.items()}
+def _classified_rows(per_notation: dict[str, dict], order: list[str], reference: str) -> list[GenRow]:
+    """Row assembly shared by both compare keys: one row per key seen in ANY
+    notation, each cell classified against the reference by payload equality."""
     all_keys = set().union(*per_notation.values()) if per_notation else set()
     ref_gens = per_notation[reference]
 
@@ -280,8 +344,52 @@ def compare(named_sigs: dict[str, Signature], *, reference: str | None = None) -
                 status = "match" if prof == ref_prof else "diff"
             cells.append((n, Cell(profile=prof, status=status)))
         rows.append(GenRow(key=key, cells=tuple(cells)))
+    return rows
 
-    rows.sort(key=lambda r: (r.key.boundary, r.key.label, r.key.left, r.key.right))
+
+def compare(
+    named_sigs: dict[str, Signature], *, reference: str | None = None, key: str = "joint",
+) -> ComparisonReport:
+    """Align several notations' signatures and classify each row against
+    ``reference`` (default: ``"master"`` if present, else the first notation).
+    Columns are ordered reference-first; interior rows first, boundary last.
+
+    ``key`` selects the row identity:
+
+    * ``"joint"`` (default) -- whole generators by :class:`CanonKey`, with
+      §32 :class:`BindingProfile` payloads.  The 0-drift oracles pin these
+      joint numbers, hence the default.
+    * ``"marginal"`` -- per-``(activity, side, type)`` :class:`ArityFact`
+      rows (:func:`marginal_facts`): the factored view that stays readable on
+      wide object-centric hubs (a ``2^k``-profile hub collapses to ``~k``
+      facts per side, and one per-type arity change is ONE diff row), at the
+      cost of erasing cross-type XOR coupling -- lossless exactly when types
+      factor, e.g. discovered OCPNs."""
+    notations = list(named_sigs)
+    if reference is None:
+        reference = "master" if "master" in named_sigs else notations[0]
+    if reference not in named_sigs:
+        raise ValueError(f"reference {reference!r} not among {notations}")
+    if key not in ("joint", "marginal"):
+        raise ValueError(f"key must be 'joint' or 'marginal', got {key!r}")
+    order = [reference] + [n for n in notations if n != reference]
+
+    if key == "joint":
+        per_notation = {n: canonical_generators(s) for n, s in named_sigs.items()}
+        rows = _classified_rows(per_notation, order, reference)
+        rows.sort(key=lambda r: (r.key.boundary, r.key.label, r.key.left, r.key.right))
+    else:
+        per_notation = {n: marginal_facts(s) for n, s in named_sigs.items()}
+        rows = _classified_rows(per_notation, order, reference)
+        _side_rank = {"in": 0, "out": 1}
+        # (typ is not None, typ or "") not str(typ): a total order even when an
+        # untyped (None) fact meets an object type literally named "None" --
+        # str() would tie them and leave their relative order to set-iteration
+        # (hash-seed) luck, breaking report byte-stability.
+        rows.sort(key=lambda r: (
+            r.key.boundary, r.key.label, _side_rank[r.key.side],
+            r.key.typ is not None, r.key.typ or "",
+        ))
     return ComparisonReport(notations=tuple(order), reference=reference, rows=tuple(rows))
 
 
@@ -303,6 +411,19 @@ def report_to_dict(report: ComparisonReport) -> dict:
 
     rows = []
     for r in report.rows:
+        if isinstance(r.key, MarginalKey):
+            rows.append({
+                "label": r.key.label,
+                "side": r.key.side,
+                "type": r.key.typ,
+                "boundary": r.key.boundary,
+                "verdict": r.verdict(),
+                "cells": {n: {"status": cell.status,
+                              "arities": None if cell.profile is None
+                              else list(cell.profile.arities)}
+                          for n, cell in r.cells},
+            })
+            continue
         rows.append({
             "label": r.key.label,
             "in": [[t, c] for t, c in r.key.left],
