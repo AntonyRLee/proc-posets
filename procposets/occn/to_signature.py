@@ -83,6 +83,28 @@ def _leg_constraints(t: str, ig: MarkerGroup, og: MarkerGroup) -> frozenset:
     return cset(*cons)
 
 
+def _generators_with_counts(
+    occn: OCCN, bindings: bool
+) -> dict[Generator, tuple[int | None, int | None]]:
+    """The interior generator set with each generator's observed binding counts
+    ``(in_count, out_count)`` -- the observation counts of the input/output
+    marker groups it was built from (``None`` for a missing side)."""
+    out: dict[Generator, tuple[int | None, int | None]] = {}
+    activities = set(occn.input_groups) | set(occn.output_groups)
+    for t in activities:
+        in_groups = occn.input_groups.get(t, []) or [(frozenset(), None)]
+        out_groups = occn.output_groups.get(t, []) or [(frozenset(), None)]
+        for ig, ic in in_groups:
+            for og, oc in out_groups:
+                if not _type_balanced(ig, og):
+                    continue
+                left = frozenset(_in_port(t, m) for m in ig)
+                right = frozenset(_out_port(t, m) for m in og)
+                cons = _leg_constraints(t, ig, og) if bindings else frozenset()
+                out[Generator(t, left, right, cons)] = (ic, oc)
+    return out
+
+
 def occn_to_signature(occn: OCCN, *, bindings: bool = True) -> Signature:
     """Mined OCCN -> generator-cospan signature.
 
@@ -90,19 +112,22 @@ def occn_to_signature(occn: OCCN, *, bindings: bool = True) -> Signature:
     constraints on the generator legs: each marker's cardinality ``[cmin,cmax]`` as an
     interval, each shared-key distribution as a partition equality. Pass
     ``bindings=False`` for the **plain** signature -- every leg ``1-1`` and no key
-    constraints -- i.e. the forgetful typed-causal-net reading (the CLI default)."""
-    gens: set[Generator] = set()
-    activities = set(occn.input_groups) | set(occn.output_groups)
-    for t in activities:
-        in_groups = [g for g, _ in occn.input_groups.get(t, [])] or [frozenset()]
-        out_groups = [g for g, _ in occn.output_groups.get(t, [])] or [frozenset()]
-        for ig in in_groups:
-            for og in out_groups:
-                if not _type_balanced(ig, og):
-                    continue
-                left = frozenset(_in_port(t, m) for m in ig)
-                right = frozenset(_out_port(t, m) for m in og)
-                cons = _leg_constraints(t, ig, og) if bindings else frozenset()
-                gens.add(Generator(t, left, right, cons))
+    constraints -- i.e. the forgetful typed-causal-net reading (the CLI default).
+
+    To thin rare co-firing structures first, filter the model:
+    ``occn_to_signature(occn.filtered(min_rel=...))`` (see :meth:`OCCN.filtered`);
+    per-generator observation counts come from :func:`occn_generator_counts`."""
+    gens = set(_generators_with_counts(occn, bindings))
     gens |= _boundary_generators(occn)
     return Signature(frozenset(gens))
+
+
+def occn_generator_counts(
+    occn: OCCN, *, bindings: bool = True
+) -> dict[Generator, tuple[int | None, int | None]]:
+    """Map each interior generator of ``occn_to_signature(occn, bindings=...)``
+    to its observed binding counts ``(in_count, out_count)``. Boundary
+    ``START_``/``END_`` generators are not included (they are synthetic, not
+    observed marker groups). Built from the SAME construction as
+    :func:`occn_to_signature`, so the keys align exactly."""
+    return _generators_with_counts(occn, bindings)

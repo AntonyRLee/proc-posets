@@ -20,7 +20,7 @@ path, so treat it as the ``[pm4py]``-adjacent discovery front-end.
 """
 from .fhm import OCDG, mine_ocdg
 from .markers import OCCN, Marker, MarkerGroup, mine_occn
-from .to_signature import occn_to_signature
+from .to_signature import occn_generator_counts, occn_to_signature
 from .unroll_occn import gamma_boundary, ground_occn, ground_run
 
 __all__ = [
@@ -31,5 +31,6 @@ __all__ = [
     "MarkerGroup",
     "mine_occn",
     "occn_to_signature",
+    "occn_generator_counts",
     "ground_occn", "ground_run", "gamma_boundary",
 ]
