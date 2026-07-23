@@ -19,6 +19,16 @@ Different firing orders of independent (AND-concurrent) generators reach the
 same final composite by different paths; we dedupe on the resulting
 multiset of generators used, keeping the first ordering found.
 
+``sigma`` may equivalently be a :class:`skeleton.FactoredSignature`: the
+per-activity ``(P, S)`` contexts are then never materialised up front --
+at each step the pool-covered left alternatives (``ready_lefts``, bounded by
+the pool, not the model) are joined with the activity's right family under the
+admissibility ``><`` (``typebalance.admissible``) *at fire-time*, yielding the
+identical concrete candidate generators the materialised signature would.
+Composites over the two forms are therefore equal -- the seam
+``tests/regression/test_cospan_compose_factored.py`` pins -- while the
+factored form stays tractable where ``|B_a| x |F_a|`` is astronomical.
+
 A composite is done when the pool empties immediately after firing a
 generator labelled ``end_label``. Loops are detected by a generator
 recurring along one path; we unroll a bounded number of repeats (so the
@@ -33,7 +43,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations, product
 
+from .engine import _gen_from_bundles
 from .signature import Generator, Port, Signature
+from .skeleton import FactoredGenerator, FactoredSignature
+from .typebalance import admissible
 
 
 @dataclass(frozen=True)
@@ -75,8 +88,87 @@ class CompositeDiagram:
         return tuple(sorted(self.labels()))
 
 
+class _AtomicReady:
+    """Candidate provider over a materialised :class:`Signature`: filter the
+    pre-sorted generator list against the pool (the original behaviour,
+    byte-for-byte -- including §38 grounding weights)."""
+
+    def __init__(self, gens: list[Generator]):
+        self.gens = gens
+
+    def ready(self, available: dict[Port, int]) -> list[Generator]:
+        # Readiness/consumption respect leg weights (§38 grounding): a grounded
+        # generator consuming a bundle of w objects on a wire needs w tokens of
+        # that port banked and removes all w in one firing. Ungrounded generators
+        # (no weights) carry weight 1 everywhere, recovering the prior behaviour.
+        return [
+            g for g in self.gens
+            if g.left and all(available.get(p, 0) >= g.weight(p) for p in g.left)
+        ]
+
+
+class _FactoredReady:
+    """Candidate provider over a :class:`FactoredSignature`: the lazy ``><``
+    join.  Per activity, only the pool-covered left alternatives enter the
+    cross-arc product (``ready_lefts``); each covered ``P`` is paired with the
+    activity's right family under ``typebalance.admissible`` at fire-time, and
+    the pair is realised as the identical concrete :class:`Generator` the slow
+    engine would have materialised -- so placement, dedup (``str`` keys) and
+    loop detection (generator equality) coincide exactly with the atomic path.
+
+    Right families are pool-independent, so they are materialised once per
+    activity on first firing and memoised (their size is a genuine XOR branching
+    factor of the behaviour -- every member is a distinct fired resolution)."""
+
+    def __init__(self, fs: FactoredSignature):
+        self.fs = fs
+        self._rights: dict[FactoredGenerator, tuple] = {}
+
+    def _right(self, fg: FactoredGenerator) -> tuple:
+        r = self._rights.get(fg)
+        if r is None:
+            r = tuple(fg.right_bundles())
+            self._rights[fg] = r
+        return r
+
+    def ready(self, available: dict[Port, int]) -> list[Generator]:
+        out: set[Generator] = set()
+        for fg in self.fs.generators:
+            lefts = fg.ready_lefts(available)
+            if not lefts:
+                continue
+            for P in lefts:
+                for S in self._right(fg):
+                    if self.fs.kappa is not None and not admissible(
+                        fg.label, P, S, self.fs.kappa
+                    ):
+                        continue
+                    out.add(_gen_from_bundles(fg.label, P, S))
+        # same deterministic order as the atomic path's pre-sorted list
+        return sorted(out, key=str)
+
+
+def _factored_sources(fs: FactoredSignature, start_label: str | None) -> list[Generator]:
+    """The zero-left concrete generators of ``fs`` -- ``(empty, S)`` for every
+    activity whose left family admits the empty union, ``kappa``-filtered;
+    ``str``-sorted to match the atomic path's seeding order."""
+    out: set[Generator] = set()
+    for fg in fs.generators:
+        if start_label is not None and fg.label != start_label:
+            continue
+        if not fg.left_can_be_empty():
+            continue
+        for S in fg.right_bundles():
+            if fs.kappa is not None and not admissible(
+                fg.label, frozenset(), S, fs.kappa
+            ):
+                continue
+            out.add(_gen_from_bundles(fg.label, frozenset(), S))
+    return sorted(out, key=str)
+
+
 def compose_signature(
-    sigma: Signature,
+    sigma: Signature | FactoredSignature,
     start_label: str | None = None,
     end_label: str | None = None,
     unroll: int = 2,
@@ -102,17 +194,29 @@ def compose_signature(
     requires the last placed generator to carry it (the single-source/sink
     convention the running-example golden test uses).  Both ``None`` (the
     boundary-explicit OCCN default) uses all sources/sinks.
+
+    A :class:`FactoredSignature` ``sigma`` composes to the same result as its
+    materialised form (module docstring): candidates are joined lazily under
+    ``><`` at fire-time instead of being drawn from a pre-built ``B x F``.
     """
-    # `Signature.generators` is a frozenset; its iteration order depends on
-    # Python's per-process hash-seed randomization. Sort once, by the same
-    # stable key as `Signature.pretty()`/`vis.pick()`, so which composite is
-    # enumerated first -- and the placement order within one, for an
-    # AND-concurrent pair -- is reproducible across runs.
-    gens = sorted(sigma, key=str)
+    if isinstance(sigma, FactoredSignature):
+        provider = _FactoredReady(sigma)
+        sources = _factored_sources(sigma, start_label)
+    else:
+        # `Signature.generators` is a frozenset; its iteration order depends on
+        # Python's per-process hash-seed randomization. Sort once, by the same
+        # stable key as `Signature.pretty()`/`vis.pick()`, so which composite is
+        # enumerated first -- and the placement order within one, for an
+        # AND-concurrent pair -- is reproducible across runs.
+        gens = sorted(sigma, key=str)
+        provider = _AtomicReady(gens)
+        sources = [
+            g for g in gens
+            if not g.left and (start_label is None or g.label == start_label)
+        ]
     by_lab: dict[str, list[Generator]] = defaultdict(list)
-    for g in gens:
-        if not g.left and (start_label is None or g.label == start_label):
-            by_lab[g.label].append(g)
+    for g in sources:
+        by_lab[g.label].append(g)
     labels = sorted(by_lab)
     results: list[CompositeDiagram] = []
     seen: set[tuple[str, ...]] = set()
@@ -123,12 +227,12 @@ def compose_signature(
                 for g in choice:
                     for p in g.right:
                         pool[p] = pool.get(p, 0) + g.weight(p)
-                _extend(gens, pool, list(choice), end_label, unroll, results, seen)
+                _extend(provider, pool, list(choice), end_label, unroll, results, seen)
     return results
 
 
 def _extend(
-    gens: list[Generator],
+    provider: _AtomicReady | _FactoredReady,
     available: dict[Port, int],
     placed: list[Generator],
     end_label: str | None,
@@ -144,14 +248,7 @@ def _extend(
                 results.append(CompositeDiagram(tuple(placed)))
         return
 
-    # Readiness/consumption respect leg weights (§38 grounding): a grounded
-    # generator consuming a bundle of w objects on a wire needs w tokens of that
-    # port banked and removes all w in one firing. Ungrounded generators (no
-    # weights) carry weight 1 everywhere, recovering the prior behaviour.
-    candidates = [
-        g for g in gens
-        if g.left and all(available.get(p, 0) >= g.weight(p) for p in g.left)
-    ]
+    candidates = provider.ready(available)
     if not candidates:
         return  # dead end: no generator is ready on the current pool
 
@@ -182,7 +279,7 @@ def _extend(
                 del new_available[p]
         for p in g.right:
             new_available[p] = new_available.get(p, 0) + g.weight(p)
-        _extend(gens, new_available, placed + [g], end_label, unroll, results, seen)
+        _extend(provider, new_available, placed + [g], end_label, unroll, results, seen)
 
 
 def _loop_body(placed: list[Generator], repeated: Generator) -> tuple[Generator, ...]:
