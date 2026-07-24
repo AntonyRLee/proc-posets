@@ -145,7 +145,7 @@ class FactoredSignature:
 
 
 def extract_skeleton(
-    g: LMGraph, kappa: Kappa | None = None, remove_silent: bool = True,
+    g: LMGraph, kappa: Kappa | None = None, remove_silent: bool = False,
     *, surface_termini: bool = False,
 ) -> FactoredSignature:
     """LM-graph -> factored skeleton (the per-arc stop of the slow pipeline).

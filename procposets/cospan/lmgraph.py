@@ -89,16 +89,19 @@ class LMGraph:
     def without_silent(self) -> LMGraph:
         """Return a copy with every silent (tau) mediator contracted out.
 
-        Each silent mediator is spliced: every ``in -> silent -> out`` path
-        becomes a direct ``in -> out`` edge whose type is the path's resolved
-        object type (an untyped step inherits the path's typed value, mirroring
-        ``engine._resolve_type``). Chains of silent mediators contract
-        transitively. For the degree-(1,1) transparent silents that discovered
-        models produce this is signature-neutral; for higher-degree silents it
-        removes their synchronisation -- which is exactly "remove the silent
-        transition". This realises the engine's default: model -> signature
-        drops silent transitions (the canonical generators live on real
-        activities only)."""
+        **Lossy — opt-in only** (``remove_silent=True``); the extractors default
+        to keeping silents transparent, which is faithful. Kept transparent, a
+        silent SEQ AND-combines its branches (``engine._combine(SEQ, ...)`` is a
+        product); this contraction instead splices every ``in -> silent -> out``
+        path as an *independent* direct ``in -> out`` edge (type = the path's
+        resolved object type, an untyped step inheriting the typed value, à la
+        ``engine._resolve_type``; chains contract transitively). For a
+        degree-(1,1) transparent silent that is signature-neutral. For a
+        **higher-degree** silent the independent splices land on the neighbouring
+        XOR places, which route each branch on its own: the synchronisation is
+        destroyed and an AND-split/join **invents behaviour** (degrades to a
+        spurious choice). Prefer the transparent default; use this only when a
+        genuinely silent-free graph is required and every silent is degree-(1,1)."""
         g = LMGraph(
             activities=set(self.activities),
             mediators=dict(self.mediators),

@@ -182,10 +182,12 @@ def backward_bundles(g: LMGraph, a: str) -> BundleSet:
 def _prepare_extraction(
     g: LMGraph, remove_silent: bool, surface_termini: bool
 ) -> tuple[LMGraph, bool]:
-    """Shared preamble of both signature extractors.
+    """Shared preamble of the signature extractors.
 
-    Drops silent transitions (model -> signature is silent-free by design), and
-    when the model already carries an explicit terminus *activity* (a master spec
+    Only contracts silent transitions when ``remove_silent=True`` -- a lossy
+    opt-in (see :meth:`LMGraph.without_silent` and :func:`extract_signature`);
+    the faithful default keeps them transparent. Separately, when the model
+    already carries an explicit terminus *activity* (a master spec
     simulated into a log re-introduces ``gamma2`` as an event; BPMN/OCCN-style
     ``END_<ot>``) leaves bare-sink termini absorbed -- that activity already is
     the final marking, so surfacing termini would double it (and collide on the
@@ -210,7 +212,7 @@ def _gen_from_bundles(lab: str, P, S) -> Generator:
 
 
 def extract_signature(
-    g: LMGraph, kappa: Kappa | None = None, remove_silent: bool = True,
+    g: LMGraph, kappa: Kappa | None = None, remove_silent: bool = False,
     *, surface_termini: bool = False,
 ) -> Signature:
     """Run the pipeline over every activity and collect ``Sigma``.
@@ -221,12 +223,18 @@ def extract_signature(
     needs). Off for the per-type flattened PN/PT/BPMN/CN (compared on interior structure) and
     the golden running example (whose boundary is explicit ``G1``/``G2`` activities).
 
-    ``remove_silent`` (default ``True``) first contracts every silent (tau)
-    mediator via :meth:`LMGraph.without_silent` -- model -> signature drops
-    silent transitions by design, so the generators carry only real activity
-    labels. Pass ``remove_silent=False`` to keep silents as transparent
-    mediators (signature-neutral for the degree-(1,1) silents that discovered
-    models emit; differs only when a silent genuinely synchronises).
+    ``remove_silent`` (default ``False``) keeps silent (tau) mediators as
+    transparent SEQ pass-throughs: they route tokens and carry object type but
+    contribute no generators, and -- crucially -- a tau AND-split/join stays
+    AND-synchronised (``_combine(SEQ, ...)`` is a *product* over its branches).
+    Tau labels never leak into ports either way (only activities mint
+    endpoints), so this faithful default already yields silent-free generators
+    on real activity labels. Pass ``remove_silent=True`` to instead contract
+    silents out via :meth:`LMGraph.without_silent` -- a lossy convenience that
+    is signature-neutral ONLY for the degree-(1,1) silents discovered models
+    usually emit; on a higher-degree silent it splices each in->out
+    independently through the neighbouring XOR places and so **invents
+    behaviour** (an AND-split degrades to a spurious choice). See that method.
 
     Admissibility ``⋈`` (``def:contexts-general``) is the type-balance filter of
     :mod:`.typebalance`: when a per-activity create/consume profile ``kappa`` is

@@ -199,7 +199,7 @@ def _gen_from_profile(lab: str, left_profile: frozenset, right_profile: frozense
 
 
 def extract_signature_fast(g: LMGraph, *, surface_termini: bool = False,
-                           remove_silent: bool = True) -> Signature:
+                           remove_silent: bool = False) -> Signature:
     """Output-sensitive twin of :func:`engine.extract_signature`: one representative
     :class:`Generator` per distinct CanonKey, without the cross-type ``|B|x|F|``
     blow-up.  See the module docstring for the exactness contract."""

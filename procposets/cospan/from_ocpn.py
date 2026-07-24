@@ -29,7 +29,7 @@ def lmgraph_from_ocpn(ocpn: dict) -> LMGraph:
 
 def signature_from_ocpn(ocpn: dict, *, canonical: bool = True,
                         surface_termini: bool = False,
-                        remove_silent: bool = True) -> Signature:
+                        remove_silent: bool = False) -> Signature:
     """OCPN dict -> generator signature ``Sigma`` (the ``lmgraph_from_ocpn`` +
     extractor pipeline in one call).
 
