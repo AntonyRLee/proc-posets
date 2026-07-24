@@ -17,8 +17,9 @@ from __future__ import annotations
 from procposets.cospan.signature import Generator, Port
 from procposets.viz._layout import (
     _BH, _BOX_PAD, _BW, _PS, Diagram, Layout, LayoutStyle, PlacedBox, Wire,
-    _box_sub, _count_crossings, _finish, _greedy_switch, _optimize_ports,
-    _route_long_edges, _straighten_boxes, lower_term,
+    _avoid_boxes, _box_sub, _count_crossings, _ctrl_curve, _finish,
+    _greedy_switch, _optimize_ports, _route_long_edges, _straighten_boxes,
+    _wire_incident, lower_term,
 )
 
 
@@ -149,6 +150,53 @@ def test_lower_term_deterministic():
     b = lower_term(_sub(_CHAIN, style), style)
     key = lambda lay: [(w.x1, w.y1, w.x2, w.y2, w.waypoints) for w in lay.wires]
     assert key(a) == key(b)
+
+
+def _curve_clips(w, b):
+    pts = list(w.waypoints) if w.waypoints is not None else [(w.x1, w.y1), (w.x2, w.y2)]
+    return any(abs(x - b.x) < b.half_w - 0.02 and abs(y - b.y) < b.half_h - 0.02
+               for (x, y) in _ctrl_curve(pts))
+
+
+def test_avoid_boxes_bends_clear_of_a_box():
+    # a straight wire A->C passes through the intervening box B; avoidance must
+    # bend its rendered curve clear of B (B is not incident to the wire).
+    off, hh = _BW / 2 + _BOX_PAD, _BH / 2
+    A = PlacedBox("A", 0.0, 0.0, hh)
+    B = PlacedBox("B", 3.0, 0.0, hh)
+    C = PlacedBox("C", 6.0, 0.0, hh)
+    w = Wire(0.0 + off, 0.0, 6.0 - off, 0.0, "t", _P("A", "t", "C"))
+    lay = Layout([A, B, C], [w], {"t"})
+    assert _curve_clips(lay.wires[0], B)  # precondition: it clips B
+    assert not _wire_incident(lay.wires[0], B)
+    out = _avoid_boxes(lay)
+    assert not _curve_clips(out.wires[0], B)  # bent clear of B
+    assert out.wires[0].waypoints is not None  # via detour waypoints
+
+
+def test_avoid_boxes_leaves_incident_boxes_alone():
+    # a wire ending on B must NOT be routed around B
+    off, hh = _BW / 2 + _BOX_PAD, _BH / 2
+    A = PlacedBox("A", 0.0, 0.0, hh)
+    B = PlacedBox("B", 3.0, 0.0, hh)
+    w = Wire(0.0 + off, 0.0, 3.0 - off, 0.0, "t", _P("A", "t", "B"))
+    lay = Layout([A, B], [w], {"t"})
+    out = _avoid_boxes(lay)
+    assert out.wires[0].waypoints is None  # untouched
+
+
+def test_box_braid_and_preset_render():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from procposets.viz.string_diagram import (
+        COMPACT_CLASS_STYLE, DrawStyle, StringDiagramStyle, render,
+    )
+    lay = LayoutStyle(straighten=True, crossing_min=True)
+    fig = render(_CHAIN, style=StringDiagramStyle(
+        layout=lay, draw=DrawStyle(box_braid=True, crossing_style="gap")))
+    plt.close(fig)
+    plt.close(render(_CHAIN, style=COMPACT_CLASS_STYLE))  # the shipped preset
 
 
 def test_greedy_switch_removes_a_swappable_crossing():

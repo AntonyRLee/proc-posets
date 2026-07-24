@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
+from math import comb
 from typing import Callable
 
 from ..cospan.compose import CompositeDiagram, LoopBox
@@ -788,6 +789,99 @@ def _route_long_edges(layout: Layout) -> Layout:
     return Layout(boxes, wires, layout.types)
 
 
+def _interp_y(pts, x: float) -> float:
+    """y of the control-point polyline ``pts`` at ``x`` (clamped to the ends)."""
+    if x <= pts[0][0]:
+        return pts[0][1]
+    if x >= pts[-1][0]:
+        return pts[-1][1]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        lo, hi = (x0, x1) if x0 <= x1 else (x1, x0)
+        if lo - 1e-9 <= x <= hi + 1e-9:
+            if abs(x1 - x0) < 1e-9:
+                return (y0 + y1) / 2
+            return y0 + (x - x0) / (x1 - x0) * (y1 - y0)
+    return pts[-1][1]
+
+
+def _wire_incident(w: Wire, b: PlacedBox) -> bool:
+    """Whether wire ``w`` starts or ends on box ``b``'s port edge."""
+    off = b.half_w + _BOX_PAD
+    return any(abs(abs(x - b.x) - off) < 1e-6
+               and b.y - b.half_h - 1e-6 <= y <= b.y + b.half_h + 1e-6
+               for (x, y) in ((w.x1, w.y1), (w.x2, w.y2)))
+
+
+def _ctrl_curve(ctrl, n: int = 64):
+    """Sample the RENDERED wire curve for a control-point list -- matches
+    ``string_diagram._curve_for``: a 2-point list is the cubic with horizontal
+    tangents, otherwise a Bernstein bezier through the points. Pure Python so the
+    matplotlib-free layout can test the actual drawn geometry against boxes."""
+    if len(ctrl) == 2:
+        (x1, y1), (x2, y2) = ctrl
+        dx = x2 - x1
+        ctrl = [(x1, y1), (x1 + 0.5 * dx, y1), (x2 - 0.5 * dx, y2), (x2, y2)]
+    deg = len(ctrl) - 1
+    out = []
+    for s in range(n):
+        t = s / (n - 1)
+        bx = by = 0.0
+        for k, (cx, cy) in enumerate(ctrl):
+            b = comb(deg, k) * (t ** k) * ((1 - t) ** (deg - k))
+            bx += b * cx
+            by += b * cy
+        out.append((bx, by))
+    return out
+
+
+def _avoid_boxes(layout: Layout, max_iters: int = 8, margin: float = 0.22) -> Layout:
+    """Bend wires around boxes they are NOT incident to. For each internal wire
+    whose RENDERED curve passes through a non-incident box body, insert three
+    waypoints across that box at its nearer (top/bottom) edge + a growing
+    ``margin``, so the drawn bezier detours over/under it. Iterated to a fixed
+    point (a detour can expose the next obstacle; the margin grows each round to
+    overcome bezier sag). Best-effort: a residual clip the curve cannot clear is
+    left for the box-braid at render time. Deterministic (boxes left-to-right)."""
+    boxes = layout.boxes
+    if len(boxes) < 2:
+        return layout
+    wires = list(layout.wires)
+
+    def controls(w):
+        return list(w.waypoints) if w.waypoints is not None else [(w.x1, w.y1), (w.x2, w.y2)]
+
+    def clips(pts, b):
+        return any(abs(x - b.x) < b.half_w - 0.02 and abs(y - b.y) < b.half_h - 0.02
+                   for (x, y) in _ctrl_curve(pts))
+
+    for rnd in range(max(1, max_iters)):
+        m = margin * (1.0 + 0.4 * rnd)  # grow the clearance to beat bezier sag
+        changed = False
+        for i, w in enumerate(wires):
+            if w.boundary:
+                continue
+            pts = controls(w)
+            obstacles = sorted((b for b in boxes if not _wire_incident(w, b) and clips(pts, b)),
+                               key=lambda b: b.x)
+            if not obstacles:
+                continue
+            for b in obstacles:
+                wy = _interp_y(pts, b.x)
+                above, below = b.y + b.half_h + m, b.y - b.half_h - m
+                ly = above if abs(above - wy) <= abs(below - wy) else below
+                x_lo = b.x - b.half_w - m * 0.6
+                x_hi = b.x + b.half_w + m * 0.6
+                mid = [p for p in pts[1:-1] if not (x_lo - 1e-9 < p[0] < x_hi + 1e-9)]
+                pts = sorted([pts[0], pts[-1], (x_lo, ly), (b.x, ly), (x_hi, ly)] + mid,
+                             key=lambda p: p[0])
+            if tuple(pts) != tuple(controls(w)):
+                wires[i] = replace(w, waypoints=tuple(pts))
+                changed = True
+        if not changed:
+            break
+    return Layout(boxes, wires, layout.types)
+
+
 def _straighten_boxes(layout: Layout, iters: int = 12, damping: float = 0.6) -> Layout:
     """Continuity pass on a finished (term-path) :class:`Layout`: relax each box's
     y toward the mean y of the boxes it is wired to (a barycentre sweep), so a
@@ -947,8 +1041,11 @@ def lower_term(sub: _Sub, style: LayoutStyle) -> Layout:
         base = _optimize_ports(base, style.crossing_min_iters)
 
     def tail(lay: Layout) -> Layout:
-        routed = _route_long_edges(lay) if style.route_long_edges else lay
-        return _greedy_switch(routed)  # final crossing-min vs the routed arcs
+        if not style.route_long_edges:
+            return _greedy_switch(lay)
+        routed = _route_long_edges(lay)
+        routed = _greedy_switch(routed)  # crossing-min vs the routed arcs
+        return _avoid_boxes(routed)  # bend wires clear of non-incident boxes
 
     def better(a: Layout, b: Layout) -> bool:  # a strictly preferred to b
         return (_count_crossings(a), -_straight_count(a)) < \

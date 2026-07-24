@@ -77,6 +77,7 @@ from ._layout import (  # noqa: F401  (re-exported: public surface + used below)
     _route_long_edges,
     _straighten_boxes,
     _count_crossings,
+    _wire_incident,
     lower_term,
     _par,
     _ports,
@@ -115,6 +116,12 @@ class DrawStyle:
     #   "gap"    -- the legacy braid: erase a constant disk from the under-wire.
     crossing_style: str = "plain"
     crossing_halo_bg: str = "white"  # halo/background colour for "casing"
+    box_braid: bool = False  # trim a wire with a small gap where it passes through
+    # a box it is NOT incident to, so it reads as going *under* that box (the
+    # render-time fallback for the residual clips :func:`_avoid_boxes` can't bend
+    # clear of). The box (drawn on top) hides the middle; this just opens a clean
+    # gap at the boundary so the wire doesn't look connected.
+    braid_gap: float = 0.09  # half-width of a braid gap (box-braid + "gap" crossings)
     label_casing: bool = True  # draw each box label on a patch in the box's own
     # facecolour, so an activity name wider than its box masks (rather than
     # collides with) any wire passing near it (readability problem: label-wire
@@ -150,7 +157,8 @@ DEFAULT_STYLE = StringDiagramStyle()
 # whole re-render batch is consistent.
 COMPACT_CLASS_STYLE = StringDiagramStyle(
     layout=LayoutStyle(straighten=True, crossing_min=True, box_width=0.9),
-    draw=DrawStyle(abbreviate_labels=True),
+    draw=DrawStyle(abbreviate_labels=True, box_braid=True,
+                   crossing_style="gap", braid_gap=0.08),
 )
 
 
@@ -355,6 +363,22 @@ def _split_at_disks(pts: np.ndarray, centres: list[np.ndarray]) -> list[np.ndarr
     return runs
 
 
+def _runs_from_mask(pts: np.ndarray, keep: np.ndarray) -> list[np.ndarray]:
+    """Split ``pts`` into runs of consecutive kept samples (each >=2 points)."""
+    runs: list[np.ndarray] = []
+    start = None
+    for k, alive in enumerate(keep):
+        if alive and start is None:
+            start = k
+        elif not alive and start is not None:
+            if k - start >= 2:
+                runs.append(pts[start:k])
+            start = None
+    if start is not None and len(pts) - start >= 2:
+        runs.append(pts[start:])
+    return runs
+
+
 def _point_at(pts: np.ndarray, s: float) -> np.ndarray:
     """The plane point at arc-length ``s`` along sampled polyline ``pts``."""
     arc = _arclen(pts)
@@ -365,7 +389,8 @@ def _point_at(pts: np.ndarray, s: float) -> np.ndarray:
     return pts[k - 1] + frac * (pts[k] - pts[k - 1])
 
 
-def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
+def _draw_wires(ax, boxes: list["PlacedBox"], wires: list["Wire"],
+                cmap: dict, style: DrawStyle) -> None:
     internal = [w for w in wires if not w.boundary]
     curves = [_curve_for(w) for w in internal]
 
@@ -377,30 +402,43 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
         line.set_gid(f"wire-{typ}-s{cnt[typ]}")
 
     mode = getattr(style, "crossing_style", "plain")
-    if mode == "gap":
-        # legacy braid: erase a constant Euclidean disk from the longer ("under")
-        # wire at each genuine (not near-port) crossing.
+    gap = getattr(style, "braid_gap", _GAP)
+    box_braid = getattr(style, "box_braid", False)
+    if mode != "casing":
+        # Unified braid: each wire is drawn as runs split at (i) box-braid cuts --
+        # samples inside a box the wire is not incident to (so it dives *under*
+        # that box), and (ii) wire-braid cuts -- a small disk on the "under" wire
+        # at each genuine crossing (only in "gap" mode; "plain" keeps bare X's).
         lengths = [_arclen(c)[-1] for c in curves]
-        breaks: list[list[np.ndarray]] = [[] for _ in internal]
-        for i in range(len(internal)):
-            for j in range(i + 1, len(internal)):
-                for s_i, s_j in _curve_crossings(curves[i], curves[j]):
-                    lo_i, hi_i = _TRIM * lengths[i], (1 - _TRIM) * lengths[i]
-                    lo_j, hi_j = _TRIM * lengths[j], (1 - _TRIM) * lengths[j]
-                    if not (lo_i <= s_i <= hi_i and lo_j <= s_j <= hi_j):
-                        continue  # too close to a port -- not a real crossing
-                    under = i if lengths[i] >= lengths[j] else j
-                    breaks[under].append(
-                        _point_at(curves[under], s_i if under == i else s_j)
-                    )
-        for w, pts, centres in zip(internal, curves, breaks):
-            for run in _split_at_disks(pts, centres):
+        cut_centres: list[list[np.ndarray]] = [[] for _ in internal]
+        if mode == "gap":
+            for i in range(len(internal)):
+                for j in range(i + 1, len(internal)):
+                    for s_i, s_j in _curve_crossings(curves[i], curves[j]):
+                        lo_i, hi_i = _TRIM * lengths[i], (1 - _TRIM) * lengths[i]
+                        lo_j, hi_j = _TRIM * lengths[j], (1 - _TRIM) * lengths[j]
+                        if not (lo_i <= s_i <= hi_i and lo_j <= s_j <= hi_j):
+                            continue  # too close to a port -- not a real crossing
+                        under = i if lengths[i] >= lengths[j] else j
+                        cut_centres[under].append(
+                            _point_at(curves[under], s_i if under == i else s_j))
+        for k, (w, pts) in enumerate(zip(internal, curves)):
+            keep = np.ones(len(pts), dtype=bool)
+            if box_braid:
+                for b in boxes:
+                    if _wire_incident(w, b):
+                        continue
+                    keep &= ~((np.abs(pts[:, 0] - b.x) < b.half_w + gap * 0.5)
+                              & (np.abs(pts[:, 1] - b.y) < b.half_h + gap * 0.5))
+            for c in cut_centres[k]:
+                keep &= np.linalg.norm(pts - c, axis=1) > gap
+            for run in _runs_from_mask(pts, keep):
                 (ln,) = ax.plot(
                     run[:, 0], run[:, 1], color=cmap[w.typ], lw=2.2,
                     solid_capstyle="butt", zorder=1, ls=style.internal_wire_linestyle,
                 )
                 _stamp(ln, w.typ)
-    elif mode == "casing":
+    else:  # mode == "casing":
         # background-colour halo behind each coloured wire, one global z-order so
         # the longer wire is consistently UNDER (its halo can't mask a shorter
         # wire, and shorter wires' halos mask it) -- no over/under flicker.
@@ -414,12 +452,6 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
                     solid_capstyle="round", zorder=z)
             (ln,) = ax.plot(pts[:, 0], pts[:, 1], color=cmap[w.typ], lw=2.2,
                             solid_capstyle="butt", zorder=z + 0.01,
-                            ls=style.internal_wire_linestyle)
-            _stamp(ln, w.typ)
-    else:  # "plain" -- bare X crossings, every wire continuous (symmetric monoidal)
-        for w, pts in zip(internal, curves):
-            (ln,) = ax.plot(pts[:, 0], pts[:, 1], color=cmap[w.typ], lw=2.2,
-                            solid_capstyle="butt", zorder=1,
                             ls=style.internal_wire_linestyle)
             _stamp(ln, w.typ)
 
@@ -510,7 +542,7 @@ def render(
         fig = ax.figure
         owns_fig = False
 
-    _draw_wires(ax, layout.wires, cmap, ds)
+    _draw_wires(ax, layout.boxes, layout.wires, cmap, ds)
     for w in layout.wires:
         if not w.boundary:
             continue
