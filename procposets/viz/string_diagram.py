@@ -73,6 +73,7 @@ from ._layout import (  # noqa: F401  (re-exported: public surface + used below)
     _finish,
     _gen_delta,
     _layout_composite,
+    _optimize_ports,
     _par,
     _ports,
     _seq,
@@ -359,6 +360,8 @@ def render(
         if offset is not None:
             sub = sub.shift(*offset)
         layout = _finish(sub, lay)
+        if lay.crossing_min:
+            layout = _optimize_ports(layout, lay.crossing_min_iters)
     elif isinstance(obj, CompositeDiagram):
         layout = _layout_composite(obj)
     else:

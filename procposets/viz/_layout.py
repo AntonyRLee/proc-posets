@@ -15,7 +15,7 @@ externally-referenced private) name from this module, so
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 from ..cospan.compose import CompositeDiagram, LoopBox
@@ -33,6 +33,10 @@ class LayoutStyle:
     port_order_key: Callable[[Port], object] | None = None
     align_boundary_stubs: bool = False
     type_lanes: dict[str | None, float] | None = None
+    crossing_min: bool = False  # term path: reassign each box's port slots to
+    # its neighbours' vertical order (:func:`_optimize_ports`), cutting the
+    # port-order-mismatch crossings the static ``sorted`` port order leaves.
+    crossing_min_iters: int = 16  # port-reassignment passes (both wire ends move)
 
 
 # --- geometry constants -----------------------------------------------------
@@ -562,3 +566,55 @@ def _consumed_later(comp: CompositeDiagram, i: int, port: Port) -> bool:
         if port in _ports(item)[0]:
             return True
     return False
+
+
+def _optimize_ports(layout: Layout, iters: int = 16) -> Layout:
+    """Per-box port-slot reassignment on a finished (compact) Layout: keep box
+    positions and the fixed per-edge slot y-values, but permute WHICH wire
+    attaches to WHICH slot so each box's ports emerge in the vertical order of
+    the boxes they connect to -- cutting the port-order-mismatch crossings the
+    term path leaves (``>>``/``@`` composition fixes port order by a static
+    ``sorted``). Strictly more powerful than the global
+    ``LayoutStyle.port_order_key`` (one order per shared port identity): a box's
+    right-slot order and its neighbour's left-slot order are chosen
+    independently. Iterated because both ends of a wire move; converges in a few
+    passes. Geometry-only and structure-preserving -- only endpoint y within a
+    box's own slot set changes. Straight internal wires only: boundary stubs and
+    lane-routed (``waypoints``) long edges are left untouched (the compact term
+    layout this targets has neither)."""
+    boxes = layout.boxes
+    wires = list(layout.wires)
+    off = _BW / 2 + _BOX_PAD
+
+    def on_edge(x, y, ex, b):
+        return abs(x - ex) < 1e-6 and b.y - b.half_h - 1e-6 <= y <= b.y + b.half_h + 1e-6
+
+    r_idx: dict = {id(b): [] for b in boxes}  # straight wires on each box's right
+    l_idx: dict = {id(b): [] for b in boxes}  # ... and left edge
+    for i, w in enumerate(wires):
+        if w.boundary or w.waypoints is not None:
+            continue
+        for b in boxes:
+            if on_edge(w.x1, w.y1, b.x + off, b):
+                r_idx[id(b)].append(i)
+                break
+        for b in boxes:
+            if on_edge(w.x2, w.y2, b.x - off, b):
+                l_idx[id(b)].append(i)
+                break
+
+    for _ in range(max(1, iters)):
+        nw = list(wires)
+        for b in boxes:
+            ri = r_idx[id(b)]
+            if len(ri) > 1:  # order this box's right ports by their consumers' y
+                slots = sorted(wires[i].y1 for i in ri)
+                for s, i in zip(slots, sorted(ri, key=lambda k: (wires[k].y2, k))):
+                    nw[i] = replace(nw[i], y1=s)
+            li = l_idx[id(b)]
+            if len(li) > 1:  # order this box's left ports by their producers' y
+                slots = sorted(wires[i].y2 for i in li)
+                for s, i in zip(slots, sorted(li, key=lambda k: (wires[k].y1, k))):
+                    nw[i] = replace(nw[i], y2=s)
+        wires = nw
+    return Layout(boxes, wires, layout.types)
