@@ -815,18 +815,99 @@ def _route_long_edges(layout: Layout) -> Layout:
         levels[lvl].append((lo_x, hi_x))
         base = (top if side > 0 else bot)
         ly = base + side * (_LANE_BASE + lvl * _LANE_STEP)
-        x1, y1, x2, y2 = w.x1, w.y1, w.x2, w.y2
-        r = min(_RISER, (x2 - x1) / 4)
-        wp = (
-            (x1, y1),
-            (x1 + r, y1),
-            (x1 + 2 * r, ly),
-            (x2 - 2 * r, ly),
-            (x2 - r, y2),
-            (x2, y2),
-        )
-        wires[i] = replace(w, waypoints=wp)
+        wires[i] = replace(w, waypoints=_lane_waypoint(w.x1, w.y1, w.x2, w.y2, ly))
     return Layout(boxes, wires, layout.types)
+
+
+def _lane_waypoint(x1: float, y1: float, x2: float, y2: float, ly: float):
+    """The 6-point lane routing for one long edge: rise from the source port
+    ``(x1,y1)`` to lane height ``ly``, run flat across, drop to the dest port
+    ``(x2,y2)``. Shared by :func:`_route_long_edges` (initial routing) and the
+    lane-reassignment search :func:`_reroute_lanes` so both build identical
+    geometry."""
+    r = min(_RISER, (x2 - x1) / 4)
+    return ((x1, y1), (x1 + r, y1), (x1 + 2 * r, ly),
+            (x2 - 2 * r, ly), (x2 - r, y2), (x2, y2))
+
+
+def _reroute_lanes(layout: Layout) -> Layout:
+    """Guarded greedy lane-SIDE reassignment on the routed layout: the analogue of
+    :func:`_greedy_switch` for the lane arcs. :func:`_route_long_edges` picks each
+    long edge's side (above/below the spine) per-edge by smaller endpoint
+    excursion, blind to how the arcs then cross *each other* -- the dominant
+    residual on busy classes (two ``items`` flows both lifted above, their spans
+    interleaved, so the lanes/risers cross). Here we repeatedly try flipping one
+    arc to the other side; each trial re-packs levels on both sides (widest span
+    first, exactly as the initial router) and rebuilds every arc's waypoint, then
+    keeps the flip only if it strictly lowers the TOTAL crossing count. Straight
+    legs and boundary stubs are fixed obstacles. Deterministic (fixed edge scan
+    order), never-worse (only strict improvements taken), and identity when no
+    flip helps (a clean layout is returned untouched)."""
+    boxes = layout.boxes
+    wires = list(layout.wires)
+    longs = [i for i, w in enumerate(wires)
+             if w.waypoints is not None and not w.boundary]
+    # spec per long arc: straight endpoints (preserved as wp[0]/wp[-1]) + span boxes
+    specs: dict[int, tuple] = {}
+    for i in longs:
+        w = wires[i]
+        x1, y1 = w.waypoints[0]
+        x2, y2 = w.waypoints[-1]
+        lo, hi = min(x1, x2), max(x1, x2)
+        sb = [b for b in boxes if lo < b.x < hi]
+        if sb:  # a routed arc always spans >=1 box; guard defensively
+            specs[i] = (x1, y1, x2, y2, lo, hi, sb)
+    longs = [i for i in longs if i in specs]
+    if len(longs) < 2:
+        return layout
+
+    def lane_y(sb, side: int, lvl: int) -> float:
+        top = max(b.y + b.half_h for b in sb)
+        bot = min(b.y - b.half_h for b in sb)
+        base = top if side > 0 else bot
+        return base + side * (_LANE_BASE + lvl * _LANE_STEP)
+
+    def infer_side(i: int) -> int:
+        sb = specs[i][6]
+        ly = wires[i].waypoints[2][1]  # flat-lane height (3rd control point)
+        top = max(b.y + b.half_h for b in sb)
+        return +1 if ly >= top - 1e-9 else -1
+
+    def build(side_of: dict[int, int]) -> Layout:
+        tw = list(wires)
+        for s in (+1, -1):  # pack levels per side, widest span first (router order)
+            grp = sorted((i for i in longs if side_of[i] == s),
+                         key=lambda i: -(specs[i][5] - specs[i][4]))
+            levels: list[list[tuple[float, float]]] = []
+            for i in grp:
+                x1, y1, x2, y2, lo, hi, sb = specs[i]
+                lvl = next((k for k, occ in enumerate(levels)
+                            if all(hi <= a or b <= lo for (a, b) in occ)), None)
+                if lvl is None:
+                    lvl = len(levels)
+                    levels.append([])
+                levels[lvl].append((lo, hi))
+                wp = _lane_waypoint(x1, y1, x2, y2, lane_y(sb, s, lvl))
+                tw[i] = replace(wires[i], x1=x1, y1=y1, x2=x2, y2=y2, waypoints=wp)
+        return Layout(boxes, tw, layout.types)
+
+    side_of = {i: infer_side(i) for i in longs}
+    cur = _count_crossings(layout)
+    best = layout
+    changed = True
+    guard = 0
+    while changed and cur > 0 and guard < 1000:
+        changed = False
+        guard += 1
+        for i in longs:
+            trial_side = dict(side_of)
+            trial_side[i] = -side_of[i]
+            tl = build(trial_side)
+            tc = _count_crossings(tl)
+            if tc < cur:
+                side_of, cur, best, changed = trial_side, tc, tl, True
+                break
+    return best
 
 
 def _interp_y(pts, x: float) -> float:
@@ -1080,16 +1161,23 @@ def lower_term(sub: _Sub, style: LayoutStyle) -> Layout:
     if style.crossing_min:
         base = _optimize_ports(base, style.crossing_min_iters)
 
+    def better(a: Layout, b: Layout) -> bool:  # a strictly preferred to b
+        return (_count_crossings(a), -_straight_count(a)) < \
+               (_count_crossings(b), -_straight_count(b))
+
     def tail(lay: Layout) -> Layout:
         if not style.route_long_edges:
             return _greedy_switch(lay)
         routed = _route_long_edges(lay)
-        routed = _greedy_switch(routed)  # crossing-min vs the routed arcs
-        return _avoid_boxes(routed)  # bend wires clear of non-incident boxes
-
-    def better(a: Layout, b: Layout) -> bool:  # a strictly preferred to b
-        return (_count_crossings(a), -_straight_count(a)) < \
-               (_count_crossings(b), -_straight_count(b))
+        # port-slot crossing-min alone (the pre-Phase-2 pipeline) ...
+        plain = _avoid_boxes(_greedy_switch(routed))
+        # ... vs also flipping arc sides to un-cross the lane arcs first. Both
+        # passes are individually never-worse, but _reroute_lanes changes
+        # _greedy_switch's starting point, so the greedy descent can land in a
+        # worse local minimum on some diagrams -- keep whichever wins, so tail()
+        # (and thus the whole lowering) is never worse than the port-only path.
+        rerouted = _avoid_boxes(_greedy_switch(_reroute_lanes(routed)))
+        return rerouted if better(rerouted, plain) else plain
 
     best = tail(base)
     if style.straighten:

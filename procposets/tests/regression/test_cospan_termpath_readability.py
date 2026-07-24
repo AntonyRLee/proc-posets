@@ -18,8 +18,8 @@ from procposets.cospan.signature import Generator, Port
 from procposets.viz._layout import (
     _BH, _BOX_PAD, _BW, _PS, Diagram, Layout, LayoutStyle, PlacedBox, Wire,
     _avoid_boxes, _box_sub, _count_crossings, _ctrl_curve, _finish,
-    _greedy_switch, _optimize_ports, _route_long_edges, _straighten_boxes,
-    _wire_incident, lower_term,
+    _greedy_switch, _optimize_ports, _reroute_lanes, _route_long_edges,
+    _straighten_boxes, _wire_incident, lower_term,
 )
 
 
@@ -241,6 +241,34 @@ def test_greedy_switch_swaps_a_waypoint_endpoint():
     assert abs(arc.waypoints[-2][1] - (-0.3)) < 1e-9
     # the lane middle is untouched (only the terminal riser re-angled)
     assert abs(arc.waypoints[3][1] - (-1.5)) < 1e-9
+
+
+def test_reroute_lanes_flips_a_crossing_arc_to_the_other_side():
+    # Two long edges both graze the intervening boxes, so _route_long_edges lifts
+    # both ABOVE (equal excursion) at stacked levels -- their spans interleave so
+    # the higher arc's riser crosses the lower arc's lane. _reroute_lanes must flip
+    # one arc below the spine -> 0 crossings, and never increase crossings.
+    hh, off = _BH / 2, _BW / 2 + _BOX_PAD
+    B = [PlacedBox(c, 2.0 * k, 0.0, hh) for k, c in enumerate("ABCDE")]
+    w1 = Wire(B[0].x + off, 0.0, B[3].x - off, 0.0, "i", _P("A", "i", "D"))  # A->D
+    w2 = Wire(B[1].x + off, 0.0, B[4].x - off, 0.0, "i", _P("B", "i", "E"))  # B->E
+    routed = _route_long_edges(Layout(B, [w1, w2], {"i"}))
+    assert all(w.waypoints is not None for w in routed.wires)  # both lifted
+    assert _count_crossings(routed) == 1
+    rer = _reroute_lanes(routed)
+    assert _count_crossings(rer) == 0
+    assert any(w.waypoints[2][1] < 0 for w in rer.wires)  # one arc now below spine
+    # never-worse + identity on the now-clean layout
+    assert _count_crossings(_reroute_lanes(rer)) == 0
+
+
+def test_reroute_lanes_noop_on_a_single_arc():
+    # only one long arc -> nothing to un-cross, the layout is returned untouched
+    hh, off = _BH / 2, _BW / 2 + _BOX_PAD
+    B = [PlacedBox(c, 2.0 * k, 0.0, hh) for k, c in enumerate("ABC")]
+    w = Wire(B[0].x + off, 0.0, B[2].x - off, 0.0, "i", _P("A", "i", "C"))
+    routed = _route_long_edges(Layout(B, [w], {"i"}))
+    assert _reroute_lanes(routed) is routed
 
 
 def test_abbreviate_scheme():
