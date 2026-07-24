@@ -51,6 +51,11 @@ class LayoutStyle:
     # OPT-IN: the loop/waterfall figures use *intentional* vertical drift (the
     # ``_seq`` step), which this would flatten -- enable only where wanted.
     straighten_iters: int = 12
+    simplify_rounds: int = 4  # term path: how many times to iterate the
+    # straighten+re-slot simplification in :func:`lower_term`. Each round's port
+    # re-assignment (crossing removal) shifts the geometry, which lets the next
+    # straighten level more wires / expose more removable crossings -- so the
+    # passes compound. Stops early once the layout stops changing (fixed point).
 
 
 # --- geometry constants -----------------------------------------------------
@@ -640,6 +645,58 @@ def _optimize_ports(layout: Layout, iters: int = 16) -> Layout:
     return Layout(boxes, wires, layout.types)
 
 
+def _greedy_switch(layout: Layout) -> Layout:
+    """Greedy adjacent-slot switch (Eades-Wormald / ELK greedySwitch) on the FINAL
+    (routed) layout: repeatedly apply the first straight-wire slot swap (on any box
+    edge) that lowers the TOTAL geometric crossing count -- including crossings
+    against the lane-routed arcs, which is why this runs after routing, not inside
+    :func:`_optimize_ports` (which optimises the pre-route straight layout). Only
+    straight internal legs move (their slot y); boundary stubs and ``waypoints``
+    arcs are fixed obstacles. Deterministic (fixed edge+pair scan order),
+    never-worse (only strict improvements taken)."""
+    boxes = layout.boxes
+    wires = list(layout.wires)
+    r_idx: dict = {id(b): [] for b in boxes}
+    l_idx: dict = {id(b): [] for b in boxes}
+    for i, w in enumerate(wires):
+        if w.boundary or w.waypoints is not None:
+            continue
+        for b in boxes:
+            if abs(w.x1 - (b.x + b.half_w + _BOX_PAD)) < 1e-6 and \
+                    b.y - b.half_h - 1e-6 <= w.y1 <= b.y + b.half_h + 1e-6:
+                r_idx[id(b)].append(i)
+                break
+        for b in boxes:
+            if abs(w.x2 - (b.x - b.half_w - _BOX_PAD)) < 1e-6 and \
+                    b.y - b.half_h - 1e-6 <= w.y2 <= b.y + b.half_h + 1e-6:
+                l_idx[id(b)].append(i)
+                break
+    edges = [(r_idx[id(b)], "y1") for b in boxes if len(r_idx[id(b)]) > 1]
+    edges += [(l_idx[id(b)], "y2") for b in boxes if len(l_idx[id(b)]) > 1]
+    if not edges:
+        return layout
+    cur = _count_crossings(layout)
+    guard = 0
+    changed = True
+    while changed and cur > 0 and guard < 1000:
+        changed = False
+        guard += 1
+        for idxs, attr in edges:
+            order = sorted(idxs, key=lambda k: getattr(wires[k], attr))
+            for a, c in zip(order, order[1:]):
+                ya, yc = getattr(wires[a], attr), getattr(wires[c], attr)
+                trial = list(wires)
+                trial[a] = replace(trial[a], **{attr: yc})
+                trial[c] = replace(trial[c], **{attr: ya})
+                tc = _count_crossings(Layout(boxes, trial, layout.types))
+                if tc < cur:
+                    wires, cur, changed = trial, tc, True
+                    break
+            if changed:
+                break
+    return Layout(boxes, wires, layout.types)
+
+
 def _route_long_edges(layout: Layout) -> Layout:
     """Post-pass on a finished (term-path) :class:`Layout`: any internal straight
     wire that would pass **behind** an intervening box is re-routed through a
@@ -859,28 +916,58 @@ def _count_crossings(layout: Layout) -> int:
                for i in range(len(segs)) for j in range(i + 1, len(segs)))
 
 
+def _straight_count(layout: Layout) -> int:
+    """How many internal legs are drawn dead level (both port endpoints at equal
+    y, so the wire renders horizontal). The straightness objective, used to
+    tie-break equal-crossing candidates toward the flatter drawing."""
+    return sum(1 for w in layout.wires
+               if not w.boundary and w.waypoints is None and abs(w.y1 - w.y2) < 1e-6)
+
+
+def _geom_key(layout: Layout):
+    """Rounded box-y signature -- equal across two layouts iff the boxes stopped
+    moving, i.e. the simplification loop has reached a fixed point."""
+    return tuple(round(b.y, 5) for b in layout.boxes)
+
+
 def lower_term(sub: _Sub, style: LayoutStyle) -> Layout:
     """Full term-path lowering with the readability stack applied per
-    :class:`LayoutStyle`: ``_finish`` -> ``_optimize_ports`` -> (guarded,
-    port-aware) ``_straighten_boxes`` -> ``_optimize_ports`` again ->
-    ``_route_long_edges``. Straightening runs on the *assigned* slots (so it can
-    level real wires) and is re-slotted after; it is adopted only when it does not
-    raise the crossing count, so it flattens ``;``-chains but leaves already-clean
-    branchy diagrams untouched."""
+    :class:`LayoutStyle`: ``_finish`` -> ``_optimize_ports`` -> **iterated**
+    (port-aware ``_straighten_boxes`` -> ``_optimize_ports``) up to
+    ``simplify_rounds`` times -> ``_route_long_edges``. The iteration is the point:
+    straightening moves boxes, which lets the port re-assignment remove crossings
+    it could not see before, which shifts the geometry so the next straighten
+    levels more wires -- the passes compound until a fixed point. Every
+    intermediate (and the un-straightened base) is a candidate; the winner
+    minimises crossings, tie-broken toward the most dead-straight wires, so a
+    ``;``-chain flattens while an already-clean branchy diagram is left untouched.
+    Fully deterministic (sorted iteration only)."""
     base = _finish(sub, style)
     if style.crossing_min:
         base = _optimize_ports(base, style.crossing_min_iters)
 
     def tail(lay: Layout) -> Layout:
-        return _route_long_edges(lay) if style.route_long_edges else lay
+        routed = _route_long_edges(lay) if style.route_long_edges else lay
+        return _greedy_switch(routed)  # final crossing-min vs the routed arcs
 
-    # Candidate layouts, straighten variants FIRST so a tie on crossings is broken
-    # toward the straighter (flatter-spine) drawing; ``min`` keeps the first best.
-    cands: list[Layout] = []
+    def better(a: Layout, b: Layout) -> bool:  # a strictly preferred to b
+        return (_count_crossings(a), -_straight_count(a)) < \
+               (_count_crossings(b), -_straight_count(b))
+
+    best = tail(base)
     if style.straighten:
-        s = _straighten_boxes(base, style.straighten_iters)
-        cands.append(tail(s))  # keep leveled slots -> straightest
-        if style.crossing_min:  # re-slot against the flattened geometry -> fewer crossings
-            cands.append(tail(_optimize_ports(s, style.crossing_min_iters)))
-    cands.append(tail(base))  # no straighten (wins only if it has strictly fewer crossings)
-    return min(cands, key=_count_crossings)
+        cur = base
+        seen = {_geom_key(cur)}
+        for _ in range(max(1, style.simplify_rounds)):
+            s = _straighten_boxes(cur, style.straighten_iters)
+            if style.crossing_min:  # re-slot against the just-straightened geometry
+                s = _optimize_ports(s, style.crossing_min_iters)
+            routed = tail(s)
+            if better(routed, best):
+                best = routed
+            key = _geom_key(s)
+            if key in seen:  # fixed point (or a 2-cycle) -> stop
+                break
+            seen.add(key)
+            cur = s
+    return best

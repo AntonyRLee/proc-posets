@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from procposets.cospan.signature import Generator, Port
 from procposets.viz._layout import (
-    _BH, _BOX_PAD, _BW, Diagram, Layout, LayoutStyle, PlacedBox, Wire, _box_sub,
-    _count_crossings, _finish, _optimize_ports, _route_long_edges,
-    _straighten_boxes, lower_term,
+    _BH, _BOX_PAD, _BW, _PS, Diagram, Layout, LayoutStyle, PlacedBox, Wire,
+    _box_sub, _count_crossings, _finish, _greedy_switch, _optimize_ports,
+    _route_long_edges, _straighten_boxes, lower_term,
 )
 
 
@@ -149,6 +149,23 @@ def test_lower_term_deterministic():
     b = lower_term(_sub(_CHAIN, style), style)
     key = lambda lay: [(w.x1, w.y1, w.x2, w.y2, w.waypoints) for w in lay.wires]
     assert key(a) == key(b)
+
+
+def test_greedy_switch_removes_a_swappable_crossing():
+    # P(top), Q(bottom) wire into C's two left slots INVERTED -> 1 crossing that a
+    # single adjacent slot swap removes.
+    off, hh, hh2 = _BW / 2 + _BOX_PAD, _BH / 2, _PS / 2 + _BH / 2
+    P = PlacedBox("P", 0.0, 0.6, hh)
+    Q = PlacedBox("Q", 0.0, -0.6, hh)
+    C = PlacedBox("C", 3.0, 0.0, hh2)
+    w1 = Wire(off, 0.6, 3.0 - off, -0.3, "t", _P("P", "t", "C"))
+    w2 = Wire(off, -0.6, 3.0 - off, 0.3, "t", _P("Q", "t", "C"))
+    lay = Layout([P, Q, C], [w1, w2], {"t"})
+    assert _count_crossings(lay) == 1
+    assert _count_crossings(_greedy_switch(lay)) == 0
+    # never-worse on an already-clean layout
+    clean = _greedy_switch(lay)
+    assert _count_crossings(_greedy_switch(clean)) == 0
 
 
 def test_abbreviate_scheme():
