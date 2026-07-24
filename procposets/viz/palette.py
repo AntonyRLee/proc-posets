@@ -25,17 +25,32 @@ OCCN_PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#e377c2"
 # --- dag_render model-combo palette (8 items, EXCLUDES green) ----------------
 DAG_COMBO_PALETTE = ["#1f77b4", "#ff7f0e", "#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22", "#d62728"]
 
-# --- string_diagram type -> colour map + overflow fallback list -------------
-# Red/black/blue variants from the "Red, Black & Blue" palette
-# (color-hex.com/color-palette/26562): one variant of each for the loop-family ports.
+# --- the single default categorical palette for string-diagram outputs ------
+# The data-viz reference palette (light mode): 8 CVD-safe hues in a fixed order
+# chosen to maximise the minimum adjacent colour-blind separation (worst adjacent
+# ΔE 24.2, well above the >=12 target; pre-validated by the dataviz skill's
+# validate_palette.js). EVERY string-diagram type colour comes from here now --
+# the named map below pins known types to fixed slots, and any other type falls
+# through to this list in sorted order (_colour_map). Fixed order IS the CVD-safety
+# mechanism: do not reorder. (aqua/yellow/magenta sit below 3:1 line-contrast on
+# white; the legend + numbered-port labels carry identity, so colour is never the
+# sole channel.)
+CATEGORICAL_DEFAULT = ["#2a78d6", "#1baf7a", "#eda100", "#008300",
+                       "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"]
+#   slot:                0 blue    1 teal    2 amber   3 green
+#                        4 violet  5 red     6 magenta 7 orange
+
+# Known types pinned to fixed CATEGORICAL_DEFAULT slots -- stable per entity across
+# figures (colour follows the type, not its rank). eICU types keep their
+# blue/green/orange/red intent; the loop-family ports move onto the unified palette.
 STRING_DIAGRAM_TYPE_COLOURS: "dict[str | None, str]" = {
-    "pat": "#1f77b4",     # patient  -- blue
-    "lab": "#2ca02c",     # lab      -- green
-    "img": "#ff7f0e",     # imaging  -- orange
-    "bed": "#d62728",     # bed      -- red
-    "alpha": ALIZARIN,    # loop-family alpha -- red
-    "beta": COTTON_BLUE,  # loop-family beta  -- blue
-    "gamma": OLD_BLACK,   # loop-family gamma -- black
-    None: "#888888",      # untyped  -- grey
+    "pat": CATEGORICAL_DEFAULT[0],    # patient -- blue
+    "lab": CATEGORICAL_DEFAULT[3],    # lab     -- green
+    "img": CATEGORICAL_DEFAULT[7],    # imaging -- orange
+    "bed": CATEGORICAL_DEFAULT[5],    # bed     -- red
+    "alpha": CATEGORICAL_DEFAULT[4],  # loop-family alpha -- violet
+    "beta": CATEGORICAL_DEFAULT[1],   # loop-family beta  -- teal
+    "gamma": CATEGORICAL_DEFAULT[2],  # loop-family gamma -- amber
+    None: "#888888",                  # untyped -- grey (neutral, not a category)
 }
-STRING_DIAGRAM_FALLBACK = ["#9467bd", "#8c564b", "#e377c2", "#17becf", "#bcbd22"]
+STRING_DIAGRAM_FALLBACK = CATEGORICAL_DEFAULT  # back-compat alias (its consumers)
