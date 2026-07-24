@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from procposets.cospan.signature import Generator, Port
 from procposets.viz._layout import (
-    _BW, Diagram, LayoutStyle, _box_sub, _count_crossings, _finish,
-    _optimize_ports, _route_long_edges, _straighten_boxes, lower_term,
+    _BH, _BOX_PAD, _BW, Diagram, Layout, LayoutStyle, PlacedBox, Wire, _box_sub,
+    _count_crossings, _finish, _optimize_ports, _route_long_edges,
+    _straighten_boxes, lower_term,
 )
 
 
@@ -34,8 +35,7 @@ def _sub(diagram, style):
 
 
 # A >> B >> C where A produces a port consumed only by C (span 2, over B); the
-# spine port A->B->C stays adjacent. The long edge grazes B once the chain is on
-# one baseline, so it must be lane-routed.
+# spine port A->B->C stays adjacent.
 _A = Generator("A", frozenset(), frozenset({_P("A", "l", "C"), _P("A", "o", "B")}))
 _B = Generator("B", frozenset({_P("A", "o", "B")}), frozenset({_P("B", "o", "C")}))
 _C = Generator("C", frozenset({_P("A", "l", "C"), _P("B", "o", "C")}), frozenset())
@@ -49,18 +49,34 @@ def _behind_any_box(layout):
             continue
         mx, my = (w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2
         for b in layout.boxes:
-            if (b.x - _BW / 2 < mx < b.x + _BW / 2
+            if (b.x - b.half_w < mx < b.x + b.half_w
                     and b.y - b.half_h < my < b.y + b.half_h):
                 return True
     return False
 
 
-def test_route_lifts_long_edge_into_lane():
+def test_no_leg_runs_behind_a_box():
+    # the readability guarantee: after the full pipeline, no straight internal
+    # leg passes behind a box body (whether that is achieved by routing it into a
+    # lane OR by straightening it clear of the boxes).
     style = LayoutStyle(straighten=True, crossing_min=True)
     layout = lower_term(_sub(_CHAIN, style), style)
-    assert any(w.waypoints is not None for w in layout.wires
-               if not w.boundary), "the span-2 edge should be lane-routed"
-    assert not _behind_any_box(layout), "no straight leg may cross a box body"
+    assert not _behind_any_box(layout)
+
+
+def test_route_lifts_a_grazing_edge_into_a_lane():
+    # a hand-built layout with a long wire that genuinely passes THROUGH an
+    # intervening box (all three boxes on one baseline) -- routing must lift it.
+    hh, off = _BH / 2, _BW / 2 + _BOX_PAD
+    A = PlacedBox("A", 0.0, 0.0, hh)
+    B = PlacedBox("B", 3.0, 0.0, hh)  # intervening, same baseline
+    C = PlacedBox("C", 6.0, 0.0, hh)
+    w = Wire(0.0 + off, 0.0, 6.0 - off, 0.0, "t", _P("A", "t", "C"))  # straight through B
+    before = Layout([A, B, C], [w], {"t"})
+    assert _behind_any_box(before)  # precondition: it does occlude B
+    routed = _route_long_edges(before)
+    assert any(x.waypoints is not None for x in routed.wires), "must be lane-routed"
+    assert not _behind_any_box(routed)
 
 
 def test_route_is_noop_without_grazing():
@@ -133,3 +149,36 @@ def test_lower_term_deterministic():
     b = lower_term(_sub(_CHAIN, style), style)
     key = lambda lay: [(w.x1, w.y1, w.x2, w.y2, w.waypoints) for w in lay.wires]
     assert key(a) == key(b)
+
+
+def test_abbreviate_scheme():
+    from procposets.viz.string_diagram import abbreviate
+    m = abbreviate({"place order", "confirm order", "create package",
+                    "send package", "pick item", "item out of stock", "γ₁", "γ₂"})
+    assert m["place order"] == "PLOR"       # two words -> first 2 of each
+    assert m["confirm order"] == "COOR"
+    assert m["create package"] == "CRPA"
+    assert m["send package"] == "SEPA"
+    assert m["item out of stock"] == "IOOS"  # 4 words -> initials
+    assert m["γ₁"] == "γ₁" and m["γ₂"] == "γ₂"  # no ascii-alnum -> pass through
+    assert len(set(m.values())) == len(m)   # unique codes
+
+
+def test_abbreviate_resolves_collisions():
+    from procposets.viz.string_diagram import abbreviate
+    # two labels whose naive code clashes must still get distinct codes
+    m = abbreviate({"pay order", "pay orders"})
+    assert m["pay order"] != m["pay orders"]
+
+
+def test_box_width_narrows_boxes():
+    wide = LayoutStyle()                         # box_width 1.4 default
+    narrow = LayoutStyle(box_width=0.8)
+    w_lay = _finish(_sub(_CHAIN, wide), wide)
+    n_lay = _finish(_sub(_CHAIN, narrow), narrow)
+    assert all(abs(b.half_w - 0.7) < 1e-9 for b in w_lay.boxes)
+    assert all(abs(b.half_w - 0.4) < 1e-9 for b in n_lay.boxes)
+    # ports sit on the (narrower) box edge; full pipeline still runs clean
+    narrow_full = LayoutStyle(box_width=0.8, straighten=True, crossing_min=True)
+    lay = lower_term(_sub(_CHAIN, narrow_full), narrow_full)
+    assert not _behind_any_box(lay)

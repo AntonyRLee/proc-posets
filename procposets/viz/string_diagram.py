@@ -119,6 +119,11 @@ class DrawStyle:
     # facecolour, so an activity name wider than its box masks (rather than
     # collides with) any wire passing near it (readability problem: label-wire
     # overlap on narrow boxes).
+    abbreviate_labels: bool = False  # replace each box label with a 4-char code
+    # (:func:`abbreviate`) so boxes stay tight and wire-tracing is unobstructed;
+    # the full names go in an on-figure key (drawn by render() when it owns the
+    # figure). ``box_label_map`` still overrides per label. Loses text detail on
+    # purpose -- pair with the key.
     open_end_markers: bool = True
     box_facecolor: str = "white"
     box_face_overrides: dict[str, str] = field(default_factory=dict)
@@ -136,6 +141,17 @@ class StringDiagramStyle:
 
 
 DEFAULT_STYLE = StringDiagramStyle()
+
+# The readable end-to-end CLASS-diagram preset: everything the term-path
+# readability stack offers, tuned for tracing typed flows through a ;-chain.
+# Straighten (guarded, port-aware median leveling) + crossing-min port slots +
+# graze-based long-edge lane routing, tight boxes, and 4-char abbreviated labels
+# with an on-figure key. Point every class/loop-figure script at this so the
+# whole re-render batch is consistent.
+COMPACT_CLASS_STYLE = StringDiagramStyle(
+    layout=LayoutStyle(straighten=True, crossing_min=True, box_width=0.9),
+    draw=DrawStyle(abbreviate_labels=True),
+)
 
 
 # --- bezier wire rendering + braid-style crossing breaks --------------------
@@ -161,6 +177,59 @@ def _colour_map(types: set[str | None]) -> dict[str | None, str]:
         out[t] = _FALLBACK[i % len(_FALLBACK)]
         i += 1
     return out
+
+
+def abbreviate(labels) -> "dict[str, str]":
+    """Deterministic short (<=4 char) uppercase code for each activity label, so
+    boxes stay tight and wires trace unobstructed; the full names go in an
+    on-figure key. Scheme: one word -> first 4 letters; two words -> first 2 of
+    each; 3+ words -> initials. A label with no ascii-alphanumerics (e.g. a ``γ``
+    terminus cap) passes through unchanged. Codes are made unique within the
+    given set, deterministically over sorted labels (a clash bumps a trailing
+    digit), so the same vocabulary always yields the same map."""
+    def code(lab: str) -> str:
+        words = _re.findall(r"[A-Za-z0-9]+", lab)
+        if not words:
+            return lab  # γ caps / symbols: keep as-is
+        if len(words) == 1:
+            return words[0][:4].upper()
+        if len(words) == 2:
+            return (words[0][:2] + words[1][:2]).upper()
+        return "".join(w[0] for w in words)[:4].upper()
+
+    out: dict[str, str] = {}
+    used: dict[str, str] = {}
+    for lab in sorted(labels):
+        c = base = code(lab)
+        k = 2
+        while c in used and used[c] != lab:
+            c = (base[:3] + str(k))[:4]
+            k += 1
+        used[c] = lab
+        out[lab] = c
+    return out
+
+
+def _draw_abbrev_key(ax, abbrev_map: dict, *, ncol: int = 4, y0: float = -0.02,
+                     dy: float = 0.032, fontsize: float = 8.0) -> None:
+    """Draw a compact ``CODE = full name`` key under an axes (axes-fraction
+    coords, so ``bbox_inches='tight'`` captures it). Sorted by code; wrapped into
+    ``ncol`` columns."""
+    items = sorted(((c, full) for full, c in abbrev_map.items() if c != full),
+                   key=lambda kv: kv[0])
+    if not items:
+        return
+    nrow = -(-len(items) // ncol)
+    ax.annotate("labels:", xy=(0, 0), xycoords="axes fraction",
+                xytext=(2, y0 * 300 - 2), textcoords="offset points",
+                fontsize=fontsize, fontweight="bold", ha="left", va="top",
+                annotation_clip=False)
+    for k, (c, full) in enumerate(items):
+        col, row = divmod(k, nrow)
+        ax.annotate(f"{c} = {full}", xy=(0, 0), xycoords="axes fraction",
+                    xytext=(2 + col * 150, y0 * 300 - 14 - row * (dy * 300)),
+                    textcoords="offset points", fontsize=fontsize - 0.5,
+                    ha="left", va="top", annotation_clip=False)
 
 
 def _gid_sanitize(label: str) -> str:
@@ -412,6 +481,9 @@ def render(
         legend_types |= {p.typ for p in signature.ports()}
     cmap = _colour_map(legend_types)
 
+    # 4-char box codes (full names -> on-figure key); box_label_map still wins.
+    abbr = abbreviate({b.label for b in layout.boxes}) if ds.abbreviate_labels else {}
+
     # default labelled view: number every boundary port once and list the
     # number -> (src, type, tgt) lookup in a legend under the diagram -- full
     # triples on the wires collide with each other and the type legend.  An
@@ -471,8 +543,8 @@ def render(
         offending = kappa is not None and _violates(b, kappa)
         bad = bad or offending
         rect = mpatches.FancyBboxPatch(
-            (b.x - _BW / 2, b.y - b.half_h),
-            _BW,
+            (b.x - b.half_w, b.y - b.half_h),
+            2 * b.half_w,
             2 * b.half_h,
             boxstyle=f"round,pad={_BOX_PAD},rounding_size=0.08",
             linewidth=2.6 if offending else 1.4,
@@ -487,7 +559,7 @@ def render(
                       else ds.box_face_overrides.get(b.label, ds.box_facecolor))
         label_bbox = (dict(boxstyle="round,pad=0.12", fc=label_face, ec="none")
                       if ds.label_casing else None)
-        txt = ax.text(b.x, b.y, ds.box_label_map.get(b.label, b.label),
+        txt = ax.text(b.x, b.y, ds.box_label_map.get(b.label, abbr.get(b.label, b.label)),
                       ha="center", va="center", fontsize=ds.box_label_fontsize,
                       zorder=4, bbox=label_bbox)
         if ds.svg_gids:
@@ -518,7 +590,7 @@ def render(
             y_in, y_out = legpos[in_p][0], legpos[out_p][0]
             apex = top + 0.16 + 0.17 * idx
             path = _MplPath(
-                [(b.x - _BW / 2, y_in), (b.x, apex), (b.x + _BW / 2, y_out)],
+                [(b.x - b.half_w, y_in), (b.x, apex), (b.x + b.half_w, y_out)],
                 [_MplPath.MOVETO, _MplPath.CURVE3, _MplPath.CURVE3],
             )
             ax.add_patch(mpatches.PathPatch(
@@ -532,7 +604,7 @@ def render(
             if len(ys) < 2:
                 continue
             # brace hugging the box's right edge (clear of the far port-number labels)
-            bx = b.x + _BW / 2 + 0.12
+            bx = b.x + b.half_w + 0.12
             ylo, yhi = min(ys), max(ys)
             ax.plot([bx, bx], [ylo, yhi], color=_darken(cmap[typ]), lw=1.4, zorder=6)
             for y in ys:
@@ -554,6 +626,9 @@ def render(
         title_fontsize=8,
         frameon=False,
     )
+
+    if owns_fig and abbr:
+        _draw_abbrev_key(ax, abbr, y0=(-0.14 if numbered_ports else -0.02))
 
     if owns_fig and numbered_ports:
         # number -> triple lookup under the diagram; offsets in points so the

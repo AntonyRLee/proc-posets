@@ -33,6 +33,9 @@ class LayoutStyle:
     port_order_key: Callable[[Port], object] | None = None
     align_boundary_stubs: bool = False
     type_lanes: dict[str | None, float] | None = None
+    box_width: float = 1.4  # term-path box width (== _BW default); shrink it for
+    # tight diagrams once labels are abbreviated (:class:`DrawStyle.abbreviate_labels`).
+    # Stored per box as ``PlacedBox.half_w`` so the post-passes stay style-free.
     crossing_min: bool = False  # term path: reassign each box's port slots to
     # its neighbours' vertical order (:func:`_optimize_ports`), cutting the
     # port-order-mismatch crossings the static ``sorted`` port order leaves.
@@ -76,6 +79,8 @@ class PlacedBox:
     half_h: float
     created: frozenset = frozenset()  # object types this box mints (right-only)
     consumed: frozenset = frozenset()  # object types this box absorbs (left-only)
+    half_w: float = _BW / 2  # half box width (defaults to the module _BW; the term
+    # path sets it from LayoutStyle.box_width so the post-passes read it per box)
 
 
 @dataclass(frozen=True)
@@ -118,7 +123,8 @@ class _Sub:
     def shift(self, dx: float, dy: float) -> "_Sub":
         return _Sub(
             [
-                PlacedBox(b.label, b.x + dx, b.y + dy, b.half_h, b.created, b.consumed)
+                PlacedBox(b.label, b.x + dx, b.y + dy, b.half_h, b.created,
+                          b.consumed, b.half_w)
                 for b in self.boxes
             ],
             [
@@ -174,6 +180,7 @@ def _box_sub(g: Generator, style: LayoutStyle) -> _Sub:
         ins = sorted(g.left)
         outs = sorted(g.right, key=lambda p: (p.tgt == "tap", p))
     created, consumed = _gen_delta(g)
+    hw = style.box_width / 2  # per-figure box half-width (LayoutStyle.box_width)
 
     if style.type_lanes is not None:
         def lane_col(ports, x):
@@ -185,18 +192,18 @@ def _box_sub(g: Generator, style: LayoutStyle) -> _Sub:
                 out.append((p, x, y + k * _PS))  # nudge same-lane duplicates
             return out
 
-        in_eps = lane_col(ins, -_BW / 2 - _BOX_PAD)
-        out_eps = lane_col(outs, _BW / 2 + _BOX_PAD)
+        in_eps = lane_col(ins, -hw - _BOX_PAD)
+        out_eps = lane_col(outs, hw + _BOX_PAD)
         ys = [y for (_, _, y) in in_eps + out_eps] or [0.0]
         centre = (max(ys) + min(ys)) / 2
         half_h = max((max(ys) - min(ys)) / 2 + _BH / 2, _BH / 2)
         return _Sub(
-            [PlacedBox(g.label, 0.0, centre, half_h, created, consumed)],
+            [PlacedBox(g.label, 0.0, centre, half_h, created, consumed, hw)],
             [],
             in_eps,
             out_eps,
-            -_BW / 2,
-            _BW / 2,
+            -hw,
+            hw,
         )
 
     n = max(len(ins), len(outs), 1)
@@ -206,15 +213,15 @@ def _box_sub(g: Generator, style: LayoutStyle) -> _Sub:
         k = len(ports)
         return [(p, x, (i - (k - 1) / 2) * _PS) for i, p in enumerate(ports)]
 
-    in_eps = col(ins, -_BW / 2 - _BOX_PAD)
-    out_eps = col(outs, _BW / 2 + _BOX_PAD)
+    in_eps = col(ins, -hw - _BOX_PAD)
+    out_eps = col(outs, hw + _BOX_PAD)
     return _Sub(
-        [PlacedBox(g.label, 0.0, 0.0, half_h, created, consumed)],
+        [PlacedBox(g.label, 0.0, 0.0, half_h, created, consumed, hw)],
         [],
         in_eps,
         out_eps,
-        -_BW / 2,
-        _BW / 2,
+        -hw,
+        hw,
     )
 
 
@@ -595,7 +602,9 @@ def _optimize_ports(layout: Layout, iters: int = 16) -> Layout:
     layout this targets has neither)."""
     boxes = layout.boxes
     wires = list(layout.wires)
-    off = _BW / 2 + _BOX_PAD
+
+    def edge_x(b, side):  # x of b's right (+1) / left (-1) port edge
+        return b.x + side * (b.half_w + _BOX_PAD)
 
     def on_edge(x, y, ex, b):
         return abs(x - ex) < 1e-6 and b.y - b.half_h - 1e-6 <= y <= b.y + b.half_h + 1e-6
@@ -606,11 +615,11 @@ def _optimize_ports(layout: Layout, iters: int = 16) -> Layout:
         if w.boundary or w.waypoints is not None:
             continue
         for b in boxes:
-            if on_edge(w.x1, w.y1, b.x + off, b):
+            if on_edge(w.x1, w.y1, edge_x(b, +1), b):
                 r_idx[id(b)].append(i)
                 break
         for b in boxes:
-            if on_edge(w.x2, w.y2, b.x - off, b):
+            if on_edge(w.x2, w.y2, edge_x(b, -1), b):
                 l_idx[id(b)].append(i)
                 break
 
@@ -650,7 +659,6 @@ def _route_long_edges(layout: Layout) -> Layout:
     if len(boxes) < 3:  # need at least one box strictly between two others
         return layout
     wires = list(layout.wires)
-    half_bw = _BW / 2
 
     def grazed(w) -> list:
         """Boxes in an intervening column whose vertical band the wire would
@@ -669,7 +677,7 @@ def _route_long_edges(layout: Layout) -> Layout:
             if not (lo_x < b.x < hi_x):  # must be an intervening column
                 continue
             ys = [w.y1 + ((x - w.x1) / span) * (w.y2 - w.y1)
-                  for x in (b.x - half_bw, b.x + half_bw)]
+                  for x in (b.x - b.half_w, b.x + b.half_w)]
             if min(ys) <= b.y + b.half_h and max(ys) >= b.y - b.half_h:
                 out.append(b)
         return out
@@ -730,14 +738,14 @@ def _straighten_boxes(layout: Layout, iters: int = 12, damping: float = 0.6) -> 
     down (readability problem (d)). Within-column box overlaps are re-separated
     after every sweep, and every attached wire endpoint (internal legs and
     boundary stubs alike) is shifted with its box, so connectivity and slot
-    order are preserved -- only box centres move. Run BEFORE
-    :func:`_optimize_ports` / :func:`_route_long_edges` (they re-slot and route
-    against the straightened geometry). Box-centre barycentre only; the exact
-    per-port offsets are (re)chosen by :func:`_optimize_ports` afterwards."""
+    order are preserved -- only box centres move. **Port-aware**: the sweep targets
+    each *wire* being level (its two port endpoints at equal y), not just box
+    centres aligned, so wires come out straight wherever the boxes allow. Run
+    AFTER :func:`_optimize_ports` (slots assigned) and BEFORE
+    :func:`_route_long_edges`."""
     boxes = layout.boxes
     if len(boxes) < 3:
         return layout
-    off = _BW / 2 + _BOX_PAD
     idx = {id(b): k for k, b in enumerate(boxes)}
     ys = [b.y for b in boxes]
     hh = [b.half_h for b in boxes]
@@ -746,31 +754,46 @@ def _straighten_boxes(layout: Layout, iters: int = 12, damping: float = 0.6) -> 
         """Index of the box whose right (``+1``) / left (``-1``) edge holds
         ``(x,y)``, or ``None``."""
         for b in boxes:
-            if abs(x - (b.x + side_sign * off)) < 1e-6 and (
+            if abs(x - (b.x + side_sign * (b.half_w + _BOX_PAD))) < 1e-6 and (
                 b.y - b.half_h - 1e-6 <= y <= b.y + b.half_h + 1e-6
             ):
                 return idx[id(b)]
         return None
 
-    adj: list[list[int]] = [[] for _ in boxes]
+    # port-AWARE links: for each wire, the offset of its port from each box's
+    # centre, so the sweep can target *wire* levelness (endpoints at equal y),
+    # not just box-centre alignment -- straight wires wherever the boxes allow.
+    links: list[list[tuple[int, float, float]]] = [[] for _ in boxes]
     for w in layout.wires:
         if w.boundary or w.waypoints is not None:
             continue
         u = box_at(w.x1, w.y1, +1)  # right edge == wire source
         v = box_at(w.x2, w.y2, -1)  # left edge == wire dest
         if u is not None and v is not None and u != v:
-            adj[u].append(v)
-            adj[v].append(u)
+            du = w.y1 - boxes[u].y  # u's right-port offset from its centre
+            dv = w.y2 - boxes[v].y  # v's left-port offset from its centre
+            links[u].append((v, du, dv))
+            links[v].append((u, dv, du))
 
     cols: dict[float, list[int]] = defaultdict(list)
     for k, b in enumerate(boxes):
         cols[round(b.x, 6)].append(k)
 
+    def median(xs):
+        s = sorted(xs)
+        n = len(s)
+        return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+
     for _ in range(max(1, iters)):
         newys = list(ys)
         for k in range(len(boxes)):
-            if adj[k]:
-                target = sum(ys[j] for j in adj[k]) / len(adj[k])
+            if links[k]:
+                # target the MEDIAN wire being exactly level (Brandes-Kopf median
+                # alignment) -> maximises the count of dead-straight wires, rather
+                # than the mean, which just minimises total slope and leaves many
+                # wires slightly bent.
+                target = median([ys[nbr] + noff - moff
+                                 for (nbr, moff, noff) in links[k]])
                 newys[k] = (1 - damping) * ys[k] + damping * target
         ys = newys
         # re-separate boxes that now overlap within a column (top -> down)
@@ -786,7 +809,7 @@ def _straighten_boxes(layout: Layout, iters: int = 12, damping: float = 0.6) -> 
 
     def dy_at(x, y):
         for b in boxes:
-            for ex in (b.x + off, b.x - off):
+            for ex in (b.x + b.half_w + _BOX_PAD, b.x - b.half_w - _BOX_PAD):
                 if abs(x - ex) < 1e-6 and (
                     b.y - b.half_h - 1e-6 <= y <= b.y + b.half_h + 1e-6
                 ):
@@ -838,22 +861,26 @@ def _count_crossings(layout: Layout) -> int:
 
 def lower_term(sub: _Sub, style: LayoutStyle) -> Layout:
     """Full term-path lowering with the readability stack applied per
-    :class:`LayoutStyle`: ``_finish`` -> (guarded) ``_straighten_boxes`` ->
-    ``_optimize_ports`` -> ``_route_long_edges``. Straightening is adopted only
-    when it does not raise the crossing count (so it flattens ``;``-chains but
-    leaves already-clean branchy diagrams untouched)."""
+    :class:`LayoutStyle`: ``_finish`` -> ``_optimize_ports`` -> (guarded,
+    port-aware) ``_straighten_boxes`` -> ``_optimize_ports`` again ->
+    ``_route_long_edges``. Straightening runs on the *assigned* slots (so it can
+    level real wires) and is re-slotted after; it is adopted only when it does not
+    raise the crossing count, so it flattens ``;``-chains but leaves already-clean
+    branchy diagrams untouched."""
     base = _finish(sub, style)
+    if style.crossing_min:
+        base = _optimize_ports(base, style.crossing_min_iters)
 
-    def finish_pipe(lay: Layout) -> Layout:
-        if style.crossing_min:
-            lay = _optimize_ports(lay, style.crossing_min_iters)
-        if style.route_long_edges:
-            lay = _route_long_edges(lay)
-        return lay
+    def tail(lay: Layout) -> Layout:
+        return _route_long_edges(lay) if style.route_long_edges else lay
 
-    out = finish_pipe(base)
+    # Candidate layouts, straighten variants FIRST so a tie on crossings is broken
+    # toward the straighter (flatter-spine) drawing; ``min`` keeps the first best.
+    cands: list[Layout] = []
     if style.straighten:
-        alt = finish_pipe(_straighten_boxes(base, style.straighten_iters))
-        if _count_crossings(alt) <= _count_crossings(out):
-            out = alt
-    return out
+        s = _straighten_boxes(base, style.straighten_iters)
+        cands.append(tail(s))  # keep leveled slots -> straightest
+        if style.crossing_min:  # re-slot against the flattened geometry -> fewer crossings
+            cands.append(tail(_optimize_ports(s, style.crossing_min_iters)))
+    cands.append(tail(base))  # no straighten (wins only if it has strictly fewer crossings)
+    return min(cands, key=_count_crossings)
