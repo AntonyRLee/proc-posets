@@ -74,6 +74,10 @@ from ._layout import (  # noqa: F401  (re-exported: public surface + used below)
     _gen_delta,
     _layout_composite,
     _optimize_ports,
+    _route_long_edges,
+    _straighten_boxes,
+    _count_crossings,
+    lower_term,
     _par,
     _ports,
     _seq,
@@ -99,6 +103,22 @@ def _darken(colour, factor: float = 0.7):
 class DrawStyle:
     boundary_linestyle: str = "--"
     internal_wire_linestyle: str = "-"
+    # How wire crossings are rendered (readability problem (c)):
+    #   "plain"  -- draw every wire whole, crossings are bare X's. Correct for a
+    #               SYMMETRIC monoidal category (c_{A,B}=c_{B,A}^-1, no over/under
+    #               data), maximises continuity, and lets type-colour carry
+    #               identity through the crossing. The default.
+    #   "casing" -- redraw the over-wire with a background-colour halo behind the
+    #               thin coloured wire, one global z-order so a wire is
+    #               consistently over/under (no flicker); a depth cue for dense
+    #               same-hue crossings, at the cost of breaking the under-wire.
+    #   "gap"    -- the legacy braid: erase a constant disk from the under-wire.
+    crossing_style: str = "plain"
+    crossing_halo_bg: str = "white"  # halo/background colour for "casing"
+    label_casing: bool = True  # draw each box label on a patch in the box's own
+    # facecolour, so an activity name wider than its box masks (rather than
+    # collides with) any wire passing near it (readability problem: label-wire
+    # overlap on narrow boxes).
     open_end_markers: bool = True
     box_facecolor: str = "white"
     box_face_overrides: dict[str, str] = field(default_factory=dict)
@@ -279,20 +299,7 @@ def _point_at(pts: np.ndarray, s: float) -> np.ndarray:
 def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
     internal = [w for w in wires if not w.boundary]
     curves = [_curve_for(w) for w in internal]
-    lengths = [_arclen(c)[-1] for c in curves]
-    breaks: list[list[np.ndarray]] = [[] for _ in internal]
-    for i in range(len(internal)):
-        for j in range(i + 1, len(internal)):
-            for s_i, s_j in _curve_crossings(curves[i], curves[j]):
-                lo_i, hi_i = _TRIM * lengths[i], (1 - _TRIM) * lengths[i]
-                lo_j, hi_j = _TRIM * lengths[j], (1 - _TRIM) * lengths[j]
-                if not (lo_i <= s_i <= hi_i and lo_j <= s_j <= hi_j):
-                    continue  # too close to a port -- not a real crossing
-                # the longer-spanning (more "background") wire passes under
-                under = i if lengths[i] >= lengths[j] else j
-                breaks[under].append(
-                    _point_at(curves[under], s_i if under == i else s_j)
-                )
+
     def _stamp(line, typ):
         if not style.svg_gids:
             return
@@ -300,18 +307,53 @@ def _draw_wires(ax, wires: list["Wire"], cmap: dict, style: DrawStyle) -> None:
         cnt[typ] = cnt.get(typ, 0) + 1
         line.set_gid(f"wire-{typ}-s{cnt[typ]}")
 
-    for w, pts, centres in zip(internal, curves, breaks):
-        for run in _split_at_disks(pts, centres):
-            (ln,) = ax.plot(
-                run[:, 0],
-                run[:, 1],
-                color=cmap[w.typ],
-                lw=2.2,
-                solid_capstyle="butt",
-                zorder=1,
-                ls=style.internal_wire_linestyle,
-            )
+    mode = getattr(style, "crossing_style", "plain")
+    if mode == "gap":
+        # legacy braid: erase a constant Euclidean disk from the longer ("under")
+        # wire at each genuine (not near-port) crossing.
+        lengths = [_arclen(c)[-1] for c in curves]
+        breaks: list[list[np.ndarray]] = [[] for _ in internal]
+        for i in range(len(internal)):
+            for j in range(i + 1, len(internal)):
+                for s_i, s_j in _curve_crossings(curves[i], curves[j]):
+                    lo_i, hi_i = _TRIM * lengths[i], (1 - _TRIM) * lengths[i]
+                    lo_j, hi_j = _TRIM * lengths[j], (1 - _TRIM) * lengths[j]
+                    if not (lo_i <= s_i <= hi_i and lo_j <= s_j <= hi_j):
+                        continue  # too close to a port -- not a real crossing
+                    under = i if lengths[i] >= lengths[j] else j
+                    breaks[under].append(
+                        _point_at(curves[under], s_i if under == i else s_j)
+                    )
+        for w, pts, centres in zip(internal, curves, breaks):
+            for run in _split_at_disks(pts, centres):
+                (ln,) = ax.plot(
+                    run[:, 0], run[:, 1], color=cmap[w.typ], lw=2.2,
+                    solid_capstyle="butt", zorder=1, ls=style.internal_wire_linestyle,
+                )
+                _stamp(ln, w.typ)
+    elif mode == "casing":
+        # background-colour halo behind each coloured wire, one global z-order so
+        # the longer wire is consistently UNDER (its halo can't mask a shorter
+        # wire, and shorter wires' halos mask it) -- no over/under flicker.
+        lengths = [_arclen(c)[-1] for c in curves]
+        n = len(internal)
+        order = sorted(range(n), key=lambda k: -lengths[k])  # longest first == lowest
+        rank = {k: r for r, k in enumerate(order)}
+        for k, (w, pts) in enumerate(zip(internal, curves)):
+            z = 1.0 + (1.8 * rank[k] / max(1, n - 1))  # in [1.0, 2.8], stays < boxes (3)
+            ax.plot(pts[:, 0], pts[:, 1], color=style.crossing_halo_bg, lw=5.0,
+                    solid_capstyle="round", zorder=z)
+            (ln,) = ax.plot(pts[:, 0], pts[:, 1], color=cmap[w.typ], lw=2.2,
+                            solid_capstyle="butt", zorder=z + 0.01,
+                            ls=style.internal_wire_linestyle)
             _stamp(ln, w.typ)
+    else:  # "plain" -- bare X crossings, every wire continuous (symmetric monoidal)
+        for w, pts in zip(internal, curves):
+            (ln,) = ax.plot(pts[:, 0], pts[:, 1], color=cmap[w.typ], lw=2.2,
+                            solid_capstyle="butt", zorder=1,
+                            ls=style.internal_wire_linestyle)
+            _stamp(ln, w.typ)
+
     for w in wires:
         if not w.boundary:
             continue
@@ -359,9 +401,7 @@ def render(
         sub = obj._sub(lay)
         if offset is not None:
             sub = sub.shift(*offset)
-        layout = _finish(sub, lay)
-        if lay.crossing_min:
-            layout = _optimize_ports(layout, lay.crossing_min_iters)
+        layout = lower_term(sub, lay)
     elif isinstance(obj, CompositeDiagram):
         layout = _layout_composite(obj)
     else:
@@ -443,8 +483,13 @@ def render(
             zorder=3,
         )
         ax.add_patch(rect)
+        label_face = ("#ffecec" if offending
+                      else ds.box_face_overrides.get(b.label, ds.box_facecolor))
+        label_bbox = (dict(boxstyle="round,pad=0.12", fc=label_face, ec="none")
+                      if ds.label_casing else None)
         txt = ax.text(b.x, b.y, ds.box_label_map.get(b.label, b.label),
-                      ha="center", va="center", fontsize=ds.box_label_fontsize, zorder=4)
+                      ha="center", va="center", fontsize=ds.box_label_fontsize,
+                      zorder=4, bbox=label_bbox)
         if ds.svg_gids:
             gid, lgid = _semantic_gid(b, layout, ds)
             rect.set_gid(gid)
