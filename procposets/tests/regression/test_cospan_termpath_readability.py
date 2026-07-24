@@ -216,6 +216,33 @@ def test_greedy_switch_removes_a_swappable_crossing():
     assert _count_crossings(_greedy_switch(clean)) == 0
 
 
+def test_greedy_switch_swaps_a_waypoint_endpoint():
+    # C has two left ports; a straight leg and a lane-routed (``waypoints``) leg
+    # enter them INVERTED so the arc's riser crosses the straight leg -- the M83
+    # ``create package`` case the pre-route _optimize_ports cannot see (it keys the
+    # long edge on its producer y, but routing makes it approach from the lane).
+    # greedy_switch must swap the waypoint endpoint with the straight one and
+    # rewrite the arc's terminal riser -> 0 crossings.
+    off, hh2 = _BW / 2 + _BOX_PAD, _PS / 2 + _BH / 2
+    C = PlacedBox("C", 3.0, 0.0, hh2)
+    xL = 3.0 - off
+    straight = Wire(0.0, -0.2, xL, -0.3, "i", _P("S", "i", "C"))  # -> LOWER port
+    wp = ((-1.0, 0.3), (-0.6, 0.3), (-0.2, -1.5), (xL - 0.6, -1.5),
+          (xL - 0.3, 0.3), (xL, 0.3))  # rises out of a low lane -> UPPER port
+    routed = Wire(-1.0, 0.3, xL, 0.3, "p", _P("P", "p", "C"), waypoints=wp)
+    lay = Layout([C], [straight, routed], {"i", "p"})
+    assert _count_crossings(lay) == 1
+    fixed = _greedy_switch(lay)
+    assert _count_crossings(fixed) == 0
+    # the arc now enters the LOWER port and its riser (last two points) + y2 moved
+    arc = next(w for w in fixed.wires if w.waypoints is not None)
+    assert abs(arc.y2 - (-0.3)) < 1e-9
+    assert abs(arc.waypoints[-1][1] - (-0.3)) < 1e-9
+    assert abs(arc.waypoints[-2][1] - (-0.3)) < 1e-9
+    # the lane middle is untouched (only the terminal riser re-angled)
+    assert abs(arc.waypoints[3][1] - (-1.5)) < 1e-9
+
+
 def test_abbreviate_scheme():
     from procposets.viz.string_diagram import abbreviate
     m = abbreviate({"place order", "confirm order", "create package",

@@ -646,21 +646,61 @@ def _optimize_ports(layout: Layout, iters: int = 16) -> Layout:
     return Layout(boxes, wires, layout.types)
 
 
+def _edge_y(w: Wire, side: int) -> float:
+    """Endpoint y of wire ``w`` on a box's right (``+1``) / left (``-1``) edge.
+    For a lane-routed (``waypoints``) wire this is the first / last control point
+    -- kept equal to ``w.y1`` / ``w.y2`` by construction (:func:`_route_long_edges`
+    builds ``wp[0]==(x1,y1)``, ``wp[-1]==(x2,y2)``)."""
+    if w.waypoints is None:
+        return w.y1 if side > 0 else w.y2
+    return w.waypoints[0][1] if side > 0 else w.waypoints[-1][1]
+
+
+def _set_edge_y(w: Wire, side: int, ny: float) -> Wire:
+    """Move ``w``'s endpoint on a box's right (``+1``) / left (``-1``) edge to
+    slot ``ny``. Straight wire: shift the port endpoint. Lane-routed wire: shift
+    that end's *riser* (the endpoint control point and its horizontal companion)
+    to ``ny`` -- the lane middle is untouched, so only the short rise into the
+    port re-angles. ``w.y1``/``w.y2`` are kept consistent with the moved control
+    points so incidence tests (:func:`_wire_incident`, ``_avoid_boxes``) stay
+    correct. Assumes the clean 6-point route shape: valid because
+    :func:`_greedy_switch` runs on the freshly-routed layout, *before*
+    :func:`_avoid_boxes` inserts extra detour points."""
+    if w.waypoints is None:
+        return replace(w, y1=ny) if side > 0 else replace(w, y2=ny)
+    wp = list(w.waypoints)
+    if side > 0:  # source end == first two points (endpoint + its riser)
+        wp[0] = (wp[0][0], ny)
+        wp[1] = (wp[1][0], ny)
+        return replace(w, y1=ny, waypoints=tuple(wp))
+    wp[-1] = (wp[-1][0], ny)  # dest end == last two points
+    wp[-2] = (wp[-2][0], ny)
+    return replace(w, y2=ny, waypoints=tuple(wp))
+
+
 def _greedy_switch(layout: Layout) -> Layout:
     """Greedy adjacent-slot switch (Eades-Wormald / ELK greedySwitch) on the FINAL
-    (routed) layout: repeatedly apply the first straight-wire slot swap (on any box
-    edge) that lowers the TOTAL geometric crossing count -- including crossings
-    against the lane-routed arcs, which is why this runs after routing, not inside
-    :func:`_optimize_ports` (which optimises the pre-route straight layout). Only
-    straight internal legs move (their slot y); boundary stubs and ``waypoints``
-    arcs are fixed obstacles. Deterministic (fixed edge+pair scan order),
-    never-worse (only strict improvements taken)."""
+    (routed) layout: repeatedly apply the first port-slot swap (on any box edge)
+    that lowers the TOTAL geometric crossing count -- including crossings against
+    the lane-routed arcs, which is why this runs after routing, not inside
+    :func:`_optimize_ports` (which optimises the pre-route straight layout).
+
+    **Lane-routed endpoints participate too.** A box edge that mixes straight legs
+    with a lane-routed (``waypoints``) leg -- e.g. a ``create package`` whose
+    ``packages`` input arrives up out of a lane while its ``items`` input comes in
+    straight -- has a port order the pre-route :func:`_optimize_ports` cannot fix
+    (it keys long edges on their *producer* y, but routing then makes them
+    approach from the lane, inverting the right order). Swapping the lane leg's
+    endpoint with a straight leg's endpoint here removes that riser/straight
+    crossing; the moved arc's terminal riser is rewritten by :func:`_set_edge_y`
+    (lane middle untouched). Boundary stubs stay fixed obstacles. Deterministic
+    (fixed edge+pair scan order), never-worse (only strict improvements taken)."""
     boxes = layout.boxes
     wires = list(layout.wires)
     r_idx: dict = {id(b): [] for b in boxes}
     l_idx: dict = {id(b): [] for b in boxes}
     for i, w in enumerate(wires):
-        if w.boundary or w.waypoints is not None:
+        if w.boundary:
             continue
         for b in boxes:
             if abs(w.x1 - (b.x + b.half_w + _BOX_PAD)) < 1e-6 and \
@@ -672,8 +712,8 @@ def _greedy_switch(layout: Layout) -> Layout:
                     b.y - b.half_h - 1e-6 <= w.y2 <= b.y + b.half_h + 1e-6:
                 l_idx[id(b)].append(i)
                 break
-    edges = [(r_idx[id(b)], "y1") for b in boxes if len(r_idx[id(b)]) > 1]
-    edges += [(l_idx[id(b)], "y2") for b in boxes if len(l_idx[id(b)]) > 1]
+    edges = [(r_idx[id(b)], +1) for b in boxes if len(r_idx[id(b)]) > 1]
+    edges += [(l_idx[id(b)], -1) for b in boxes if len(l_idx[id(b)]) > 1]
     if not edges:
         return layout
     cur = _count_crossings(layout)
@@ -682,13 +722,13 @@ def _greedy_switch(layout: Layout) -> Layout:
     while changed and cur > 0 and guard < 1000:
         changed = False
         guard += 1
-        for idxs, attr in edges:
-            order = sorted(idxs, key=lambda k: getattr(wires[k], attr))
+        for idxs, side in edges:
+            order = sorted(idxs, key=lambda k: _edge_y(wires[k], side))
             for a, c in zip(order, order[1:]):
-                ya, yc = getattr(wires[a], attr), getattr(wires[c], attr)
+                ya, yc = _edge_y(wires[a], side), _edge_y(wires[c], side)
                 trial = list(wires)
-                trial[a] = replace(trial[a], **{attr: yc})
-                trial[c] = replace(trial[c], **{attr: ya})
+                trial[a] = _set_edge_y(trial[a], side, yc)
+                trial[c] = _set_edge_y(trial[c], side, ya)
                 tc = _count_crossings(Layout(boxes, trial, layout.types))
                 if tc < cur:
                     wires, cur, changed = trial, tc, True
