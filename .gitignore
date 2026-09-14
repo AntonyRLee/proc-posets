@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+dist/
+*.egg-info/
+
+# scratch must not accumulate inside the importable package
+procposets/**/*.zip
+procposets/**/*.md
+
+# tooling caches
+.ruff_cache/
+.mypy_cache/

@@ -1,0 +1,55 @@
+cff-version: 1.2.0
+title: >-
+  proc-posets: a poset, cospan and string-diagram core for process mining
+message: >-
+  If you use this software, please cite the archived release (the DOI below),
+  not the repository URL. A URL moves; a DOI does not.
+type: software
+authors:
+  - given-names: Antony R.
+    family-names: Lee
+    email: antony.lee@gmail.com
+    affiliation: University of Birmingham
+repository-code: 'https://github.com/AntonyRLee/proc-posets'
+abstract: >-
+  Reusable poset / cospan / string-diagram calculation, simulation, estimation
+  and comparison core for process-mining research. It provides the canonical
+  modular (block) decomposition of a labelled poset, a stochastic matrix
+  distance and its known-law estimators, and screens that ask of a log
+  whether it carries within-case concurrency or loops at all. The core is
+  stdlib-only and installs at Python 3.10; numpy, graph, pm4py and plotting
+  layers sit behind extras.
+keywords:
+  - process mining
+  - partial orders
+  - string diagrams
+  - cospans
+  - concurrency
+license: MIT
+version: 0.1.0
+date-released: '2026-09-14'
+# doi: recorded here once the release is archived.  Use the CONCEPT DOI -- the
+# one that always resolves to the latest version -- so this file does not go
+# stale at the next release.
+references:
+  - type: conference-paper
+    title: Object-Centric Causal Nets
+    authors:
+      - given-names: Lukas
+        family-names: Liss
+      - given-names: Caspar
+        family-names: Mensing
+      - given-names: Wil M. P.
+        name-particle: van der
+        family-names: Aalst
+    collection-title: Advanced Information Systems Engineering (CAiSE 2025)
+    publisher:
+      name: Springer Nature Switzerland
+    year: 2025
+    start: 94
+    end: 110
+    doi: 10.1007/978-3-031-94571-7_6
+    notes: >-
+      `procposets.occn` implements this paper's published algorithm (the
+      Listing 1.1 pseudocode) independently. No code from the authors'
+      reference implementation is included or redistributed here.
