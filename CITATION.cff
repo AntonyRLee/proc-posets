@@ -28,9 +28,10 @@ keywords:
 license: MIT
 version: 0.1.0
 date-released: '2026-09-14'
-# doi: recorded here once the release is archived.  Use the CONCEPT DOI -- the
-# one that always resolves to the latest version -- so this file does not go
-# stale at the next release.
+doi: 10.5281/zenodo.22757993
+# The CONCEPT DOI: it always resolves to the latest archived version, so this
+# file does not go stale at the next release.  Text citing one specific release
+# should use that release's own version DOI instead.
 references:
   - type: conference-paper
     title: Object-Centric Causal Nets

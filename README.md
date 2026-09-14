@@ -210,7 +210,15 @@ Cite the archived release rather than the repository URL: a URL moves, a DOI
 does not. `CITATION.cff` carries the machine-readable record and GitHub renders
 a *Cite this repository* button from it.
 
-<!-- DOI: recorded here once the release is archived on Zenodo.  The concept
-     DOI (the one that always resolves to the latest version) belongs in this
-     paragraph and in CITATION.cff; the version DOI belongs in whatever text
-     cites a specific release. -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22757993.svg)](https://doi.org/10.5281/zenodo.22757993)
+
+Two DOIs exist and they are not interchangeable:
+
+| | DOI | resolves to |
+|---|---|---|
+| **concept** | [`10.5281/zenodo.22757993`](https://doi.org/10.5281/zenodo.22757993) | always the latest archived version |
+| **version** | [`10.5281/zenodo.22757994`](https://doi.org/10.5281/zenodo.22757994) | release 0.1.0, permanently |
+
+Cite the **version** DOI when you name a specific release — a thesis, a paper,
+anything that must still mean the same thing after the next release. Cite the
+**concept** DOI when you mean the software in general.
