@@ -1,0 +1,109 @@
+[project]
+name = "proc-posets"
+dynamic = ["version"]  # single-sourced from procposets/__init__.py:__version__
+description = "Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research."
+readme = "README.md"
+requires-python = ">=3.10"          # verified: no first-party source in any consumer repo uses >3.10 syntax
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Antony Lee", email = "antony.lee@gmail.com" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Typing :: Typed",
+]
+
+# NO hard runtime dependency: `import procposets` and the whole stdlib core
+# (poset algebra, decomposition, traces, stochastic-matrix distance, known-law
+# EM) pull nothing third-party.  numpy / networkx / pm4py / matplotlib are all
+# opt-in extras below; the numpy layer loads lazily (PEP 562
+# __getattr__ in __init__), so touching it is what pulls numpy.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/AntonyRLee/proc-posets"
+Repository = "https://github.com/AntonyRLee/proc-posets"
+
+# Lower bounds are kept 3.10-installable so the >=3.10 floor still yields a
+# resolvable universal lock: uv fork-resolves
+# each extra to a 3.10-compatible release on the 3.10 branch and the newest on
+# 3.13.  The extras are exercised at 3.12/3.13; consumers pin tighter.
+[project.optional-dependencies]
+numeric  = ["numpy>=1.24"]   # numpy: MCMC linear-extension sampling and the numeric helpers
+graph    = ["networkx>=3.1"]                                 # Layer B1: occurrence / splice / trace-language / DP extraction
+# NB: pm4py is AGPL-3.0.  Nothing of it is redistributed here and this package
+# stays MIT, but installing this extra (or `all`) builds an AGPL-covered
+# combination on the user's machine -- see "Third-party software" in README.md.
+pm4py    = ["pm4py>=2.7.22.5", "pandas>=2.0", "networkx>=3.1"]  # Layer B2: model adapters (implies the graph paths)
+viz      = ["matplotlib>=3.8", "graphviz>=0.21", "numpy>=1.24"] # Layer C: renderers (string_diagram/spm_viz use numpy; dag_render needs the `dot` binary)
+all      = ["proc-posets[numeric,graph,pm4py,viz]"]
+
+[dependency-groups]
+# the package's own suite exercises every layer, so dev pulls numpy + matplotlib;
+# ruff + mypy back the shipped py.typed marker (see CI).
+dev = ["pytest>=9.1.1", "numpy>=1.24", "matplotlib>=3.10.9", "ruff>=0.6.0", "mypy>=1.10"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "procposets/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["procposets"]
+# The value-pinned golden corpus is dev-only; stray scratch must never ship.
+exclude = ["procposets/tests", "**/*.zip", "**/*.md"]
+
+[tool.hatch.build.targets.sdist]
+# Curated allowlist: the package + the user-facing docs/metadata only, so the
+# source distribution never bundles dev-session artifacts.
+include = [
+  "procposets/",
+  "examples/",          # the thesis prints routes into these; an sdist without
+                        # them is an archive a reader cannot follow
+  "CITATION.cff",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["procposets/tests"]
+# extra-gating is by capability in procposets/tests/regression/conftest.py
+# (find_spec on numpy/networkx), not marker-based, so no custom markers here.
+filterwarnings = ["ignore:The hashes produced for directed graphs changed:UserWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Correctness-focused gate (pyflakes): unused imports/vars, undefined names,
+# f-string mistakes. Cosmetic style (line length, semicolons) is intentionally
+# not enforced -- the extracted code predates a formatter; tighten incrementally.
+select = ["F"]
+
+[tool.ruff.lint.per-file-ignores]
+# rel.py deliberately re-exports rel_sp / rel_classes names so that
+# `from procposets.rel import ...` and the package __init__ keep resolving;
+# those names are unused *within* rel.py by design.
+"procposets/rel.py" = ["F401"]
+
+[tool.mypy]
+# The RUNTIME floor is 3.10 (see requires-python); this is the version mypy
+# type-checks AGAINST, and it must be >= 3.12 because numpy's bundled stubs use
+# `type` statements.  At 3.10 mypy aborted on those stubs before checking any
+# first-party file -- the advisory CI step was passing by not running.
+python_version = "3.12"
+ignore_missing_imports = true   # optional-extra libs (pm4py/networkx/...) aren't always present
+# Lenient baseline the just-extracted code satisfies; backs the py.typed marker
+# without blocking CI on a full strict pass (tighten over time).

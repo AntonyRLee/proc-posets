@@ -1,0 +1,24 @@
+{
+  "title": "proc-posets: a poset, cospan and string-diagram core for process mining",
+  "description": "<p>Reusable poset / cospan / string-diagram calculation, simulation, estimation and comparison core for process-mining research. It provides the canonical modular (block) decomposition of a labelled poset, a stochastic matrix distance and its known-law estimators, and screens that ask of a log whether it carries within-case concurrency or loops at all.</p><p>The core is stdlib-only and installs at Python 3.10; the numpy, graph, pm4py and plotting layers sit behind extras. Every extraction seam is locked by an in-repo regression suite that reproduces the originating code value-for-value.</p>",
+  "creators": [
+    {
+      "name": "Lee, Antony R.",
+      "affiliation": "University of Birmingham"
+    }
+  ],
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "version": "0.1.0",
+  "language": "eng",
+  "keywords": [
+    "process mining",
+    "partial orders",
+    "posets",
+    "string diagrams",
+    "cospans",
+    "concurrency",
+    "Python"
+  ]
+}
